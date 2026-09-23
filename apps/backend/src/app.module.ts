@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { AuthModule } from './auth/auth.module';
+import { DriversModule } from './drivers/drivers.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { AuthModule } from './auth/auth.module';
       isGlobal: true,
     }),
     AuthModule,
+    DriversModule,
     SequelizeModule.forRootAsync({
       inject: [ConfigService],
 
@@ -24,8 +26,10 @@ import { AuthModule } from './auth/auth.module';
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_NAME'),
 
+        // Схема теперь только через миграции (`npm run migrate` в apps/backend) — autoLoadModels
+        // нужен лишь чтобы Sequelize знал об атрибутах моделей для запросов.
         autoLoadModels: true,
-        synchronize: true,
+        synchronize: false,
       }),
     }),
   ],

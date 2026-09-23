@@ -1,0 +1,7 @@
+# root-hoisted deps (npm workspaces); each app also has its own node_modules
+node_modules/
+
+# leftover backups from de-nesting apps/*/.git into this single repo
+.git.bak/
+
+.DS_Store

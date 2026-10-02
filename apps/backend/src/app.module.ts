@@ -5,6 +5,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { AuthModule } from './auth/auth.module';
 import { DriversModule } from './drivers/drivers.module';
+import { PayrollModule } from './payroll/payroll.module';
+import { ShiftsModule } from './shifts/shifts.module';
 
 @Module({
   imports: [
@@ -13,6 +15,8 @@ import { DriversModule } from './drivers/drivers.module';
     }),
     AuthModule,
     DriversModule,
+    PayrollModule,
+    ShiftsModule,
     SequelizeModule.forRootAsync({
       inject: [ConfigService],
 

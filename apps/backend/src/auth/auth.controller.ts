@@ -48,7 +48,10 @@ export class AuthController {
   }
 
   private setAuthCookies(res: Response, accessToken: string, refreshToken: string) {
-    const secure = this.config.get<string>('NODE_ENV') === 'production';
+    // COOKIE_SECURE=false — для деплоя без HTTPS (по IP), иначе браузер не сохранит куки
+    const cookieSecure = this.config.get<string>('COOKIE_SECURE');
+    const secure =
+      cookieSecure !== undefined ? cookieSecure === 'true' : this.config.get<string>('NODE_ENV') === 'production';
 
     res.cookie('access_token', accessToken, {
       httpOnly: true,

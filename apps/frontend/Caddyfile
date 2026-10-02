@@ -1,0 +1,14 @@
+# SITE_ADDRESS = домен (Caddy сам выпустит HTTPS-сертификат) или :80 для HTTP по IP
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy backend:3000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

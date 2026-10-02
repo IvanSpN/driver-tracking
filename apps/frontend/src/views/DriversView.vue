@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useDriversStore } from '../stores/drivers'
 import DriverFormModal from '../components/DriverFormModal.vue'
 import type { Driver, DriverInput } from '../api/drivers'
+import { formatMoney } from '../utils/money'
 
 const store = useDriversStore()
 const modalOpen = ref(false)
@@ -83,11 +85,23 @@ async function handleRestore(driver: Driver) {
     <ul v-else class="driver-list">
       <li v-for="driver in store.drivers" :key="driver.id" class="driver-row">
         <div class="driver-info">
-          <span class="driver-name">{{ driver.lastName }} {{ driver.firstName }} {{ driver.middleName }}</span>
+          <RouterLink :to="{ name: 'driver-detail', params: { id: driver.id } }" class="driver-name">
+            {{ driver.lastName }} {{ driver.firstName }} {{ driver.middleName }}
+          </RouterLink>
           <span class="badge" :class="driver.isOfficial ? 'badge-outline' : 'badge-solid'">
             {{ driver.isOfficial ? 'белая' : 'чёрная' }}
           </span>
           <span v-if="driver.phone" class="driver-phone">{{ driver.phone }}</span>
+          <span v-if="driver.currentShift" class="driver-shift">
+            на вахте{{ driver.currentShift.daysLeft !== null ? `, осталось ${driver.currentShift.daysLeft} дн.` : '' }}
+          </span>
+          <span
+            v-if="driver.totalDueMinor"
+            class="driver-due"
+            :class="{ overpaid: driver.totalDueMinor < 0 }"
+          >
+            {{ driver.totalDueMinor > 0 ? 'должны' : 'переплата' }}: {{ formatMoney(Math.abs(driver.totalDueMinor)) }}
+          </span>
         </div>
 
         <div class="driver-actions">
@@ -117,16 +131,6 @@ async function handleRestore(driver: Driver) {
 .header h1 {
   font-size: 20px;
   margin: 0;
-}
-
-.btn-primary {
-  border: none;
-  border-radius: var(--radius-sm);
-  background: var(--accent);
-  color: var(--accent-fg);
-  padding: 8px 14px;
-  font-size: 14px;
-  cursor: pointer;
 }
 
 .filters {
@@ -205,11 +209,33 @@ async function handleRestore(driver: Driver) {
 
 .driver-name {
   font-size: 14px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.driver-name:hover {
+  text-decoration: underline;
 }
 
 .driver-phone {
   font-size: 13px;
   color: var(--text-muted);
+}
+
+.driver-shift {
+  font-size: 13px;
+  color: var(--positive);
+}
+
+.driver-due {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.driver-due.overpaid {
+  color: var(--text-muted);
+  font-weight: 400;
 }
 
 .badge {
@@ -233,19 +259,5 @@ async function handleRestore(driver: Driver) {
 .driver-actions {
   display: flex;
   gap: 12px;
-}
-
-.btn-link {
-  border: none;
-  background: none;
-  padding: 0;
-  font-size: 13px;
-  color: var(--accent);
-  cursor: pointer;
-  text-decoration: underline;
-}
-
-.btn-link.danger {
-  color: var(--danger);
 }
 </style>

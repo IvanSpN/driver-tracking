@@ -9,6 +9,9 @@ export interface Driver {
   isOfficial: boolean
   note: string | null
   deletedAt: string | null
+  // приходит только со списка (GET /drivers)
+  totalDueMinor?: number
+  currentShift?: { id: string; startDate: string; endDate: string | null; daysLeft: number | null } | null
 }
 
 export interface DriverListFilter {
@@ -30,6 +33,10 @@ export function fetchDrivers(filter: DriverListFilter = {}) {
   if (filter.official !== undefined) params.official = String(filter.official)
   if (filter.archived) params.archived = 'true'
   return apiClient.get<Driver[]>('/drivers', { params })
+}
+
+export function fetchDriver(id: string) {
+  return apiClient.get<Driver>(`/drivers/${id}`)
 }
 
 export function createDriver(input: DriverInput) {

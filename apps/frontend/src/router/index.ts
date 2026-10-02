@@ -4,6 +4,7 @@ import AppLayout from '../layouts/AppLayout.vue'
 import LoginView from '../views/LoginView.vue'
 import DashboardView from '../views/DashboardView.vue'
 import DriversView from '../views/DriversView.vue'
+import DriverDetailView from '../views/DriverDetailView.vue'
 import SettingsView from '../views/SettingsView.vue'
 
 const router = createRouter({
@@ -16,6 +17,7 @@ const router = createRouter({
       children: [
         { path: '', name: 'dashboard', component: DashboardView },
         { path: 'drivers', name: 'drivers', component: DriversView },
+        { path: 'drivers/:id', name: 'driver-detail', component: DriverDetailView },
         { path: 'settings', name: 'settings', component: SettingsView },
       ],
     },

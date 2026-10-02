@@ -3,9 +3,11 @@ import { SequelizeModule } from '@nestjs/sequelize';
 import { Driver } from '../database/models/driver.model';
 import { DriversController } from './drivers.controller';
 import { DriversService } from './drivers.service';
+import { PayrollModule } from '../payroll/payroll.module';
+import { ShiftsModule } from '../shifts/shifts.module';
 
 @Module({
-  imports: [SequelizeModule.forFeature([Driver])],
+  imports: [SequelizeModule.forFeature([Driver]), PayrollModule, ShiftsModule],
   controllers: [DriversController],
   providers: [DriversService],
 })

@@ -18,7 +18,8 @@ export const useDriversStore = defineStore('drivers', () => {
         official: officialFilter.value === 'all' ? undefined : officialFilter.value === 'official',
         archived: showArchived.value,
       })
-      drivers.value = data
+      // сверху — кому должны больше всего
+      drivers.value = [...data].sort((a, b) => (b.totalDueMinor ?? 0) - (a.totalDueMinor ?? 0))
     } finally {
       loading.value = false
     }

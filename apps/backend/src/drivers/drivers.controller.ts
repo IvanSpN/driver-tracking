@@ -1,5 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { DriversService } from './drivers.service';
+import { PayrollService } from '../payroll/payroll.service';
+import { ShiftsService } from '../shifts/shifts.service';
 import { CreateDriverDto } from './dto/create-driver.dto';
 import { UpdateDriverDto } from './dto/update-driver.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -7,14 +9,30 @@ import type { AccessTokenPayload } from '../auth/auth.service';
 
 @Controller('drivers')
 export class DriversController {
-  constructor(private readonly driversService: DriversService) {}
+  constructor(
+    private readonly driversService: DriversService,
+    private readonly payrollService: PayrollService,
+    private readonly shiftsService: ShiftsService,
+  ) {}
 
   @Get()
-  list(@Query('official') official?: string, @Query('archived') archived?: string) {
-    return this.driversService.list({
+  async list(@Query('official') official?: string, @Query('archived') archived?: string) {
+    const drivers = await this.driversService.list({
       official: official === undefined ? undefined : official === 'true',
       archived: archived === 'true',
     });
+
+    const ids = drivers.map((d) => d.id);
+    const [totals, currentShifts] = await Promise.all([
+      this.payrollService.getTotalDueByDriver(ids),
+      this.shiftsService.getCurrentShiftByDriver(ids),
+    ]);
+
+    return drivers.map((d) => ({
+      ...d.toJSON(),
+      totalDueMinor: totals.get(d.id) ?? 0,
+      currentShift: currentShifts.get(d.id) ?? null,
+    }));
   }
 
   @Post()

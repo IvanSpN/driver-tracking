@@ -1,11 +1,24 @@
-import { Table, Column, Model, DataType, PrimaryKey, Default, AllowNull, ForeignKey, BelongsTo } from 'sequelize-typescript';
+import {
+  Table,
+  Column,
+  Model,
+  DataType,
+  PrimaryKey,
+  Default,
+  AllowNull,
+  ForeignKey,
+  BelongsTo,
+} from 'sequelize-typescript';
 import { User } from './user.model';
 
 @Table({
   tableName: 'drivers',
   underscored: true,
   paranoid: true,
-  indexes: [{ fields: ['last_name', 'first_name'] }, { fields: ['deleted_at'] }],
+  indexes: [
+    { fields: ['last_name', 'first_name'] },
+    { fields: ['deleted_at'] },
+  ],
 })
 export class Driver extends Model {
   @PrimaryKey

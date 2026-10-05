@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import { PayrollService } from './payroll.service';
 import { UpsertAccrualDto } from './dto/upsert-accrual.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -11,7 +22,11 @@ export class PayrollController {
   constructor(private readonly payrollService: PayrollService) {}
 
   @Get('drivers/:driverId/payroll')
-  getPayroll(@Param('driverId') driverId: string, @Query('from') from?: string, @Query('to') to?: string) {
+  getPayroll(
+    @Param('driverId') driverId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
     return this.payrollService.listPayroll(driverId, from, to);
   }
 
@@ -27,12 +42,18 @@ export class PayrollController {
 
   @Delete('drivers/:driverId/accruals/:period')
   @HttpCode(204)
-  deleteAccrual(@Param('driverId') driverId: string, @Param('period') period: string) {
+  deleteAccrual(
+    @Param('driverId') driverId: string,
+    @Param('period') period: string,
+  ) {
     return this.payrollService.deleteAccrual(driverId, period);
   }
 
   @Get('drivers/:driverId/payments')
-  listPayments(@Param('driverId') driverId: string, @Query('period') period?: string) {
+  listPayments(
+    @Param('driverId') driverId: string,
+    @Query('period') period?: string,
+  ) {
     return this.payrollService.listPayments(driverId, period);
   }
 

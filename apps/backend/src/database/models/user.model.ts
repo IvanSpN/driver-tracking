@@ -1,4 +1,13 @@
-import { Table, Column, Model, DataType, PrimaryKey, Default, Unique, AllowNull } from 'sequelize-typescript';
+import {
+  Table,
+  Column,
+  Model,
+  DataType,
+  PrimaryKey,
+  Default,
+  Unique,
+  AllowNull,
+} from 'sequelize-typescript';
 
 export enum UserRole {
   ADMIN = 'ADMIN',

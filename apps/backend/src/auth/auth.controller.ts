@@ -1,4 +1,13 @@
-import { Body, Controller, Get, HttpCode, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Post,
+  Req,
+  Res,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { AuthService, AccessTokenPayload } from './auth.service';
@@ -16,8 +25,12 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(200)
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
-    const { accessToken, refreshToken, user } = await this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, refreshToken, user } =
+      await this.authService.login(dto);
     this.setAuthCookies(res, accessToken, refreshToken);
     return { user };
   }
@@ -25,8 +38,11 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(200)
-  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const token = req.cookies?.['refresh_token'];
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const token = req.cookies?.['refresh_token'] as string | undefined;
     if (!token) throw new UnauthorizedException();
 
     const { accessToken, refreshToken } = await this.authService.refresh(token);
@@ -47,11 +63,17 @@ export class AuthController {
     return { user };
   }
 
-  private setAuthCookies(res: Response, accessToken: string, refreshToken: string) {
+  private setAuthCookies(
+    res: Response,
+    accessToken: string,
+    refreshToken: string,
+  ) {
     // COOKIE_SECURE=false — для деплоя без HTTPS (по IP), иначе браузер не сохранит куки
     const cookieSecure = this.config.get<string>('COOKIE_SECURE');
     const secure =
-      cookieSecure !== undefined ? cookieSecure === 'true' : this.config.get<string>('NODE_ENV') === 'production';
+      cookieSecure !== undefined
+        ? cookieSecure === 'true'
+        : this.config.get<string>('NODE_ENV') === 'production';
 
     res.cookie('access_token', accessToken, {
       httpOnly: true,

@@ -12,7 +12,9 @@ export interface ListDriversFilter {
 
 @Injectable()
 export class DriversService {
-  constructor(@InjectModel(Driver) private readonly driverModel: typeof Driver) {}
+  constructor(
+    @InjectModel(Driver) private readonly driverModel: typeof Driver,
+  ) {}
 
   list(filter: ListDriversFilter) {
     const where: Record<string, unknown> = {};

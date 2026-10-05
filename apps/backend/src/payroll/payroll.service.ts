@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/sequelize';
 import { Op, QueryTypes, Sequelize } from 'sequelize';
 import { Accrual } from '../database/models/accrual.model';
-import { Payment } from '../database/models/payment.model';
+import { PayChannel, Payment } from '../database/models/payment.model';
 import { UpsertAccrualDto } from './dto/upsert-accrual.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
@@ -26,22 +26,36 @@ export class PayrollService {
     @InjectConnection() private readonly sequelize: Sequelize,
   ) {}
 
-  async upsertAccrual(driverId: string, period: string, dto: UpsertAccrualDto, createdById: string) {
+  async upsertAccrual(
+    driverId: string,
+    period: string,
+    dto: UpsertAccrualDto,
+    createdById: string,
+  ) {
     const periodDate = parsePeriod(period);
-    const existing = await this.accrualModel.findOne({ where: { driverId, period: periodDate } });
+    const existing = await this.accrualModel.findOne({
+      where: { driverId, period: periodDate },
+    });
 
     if (existing) {
       await existing.update({ ...dto, createdById });
       return this.toAccrualJson(existing);
     }
 
-    const created = await this.accrualModel.create({ driverId, period: periodDate, ...dto, createdById });
+    const created = await this.accrualModel.create({
+      driverId,
+      period: periodDate,
+      ...dto,
+      createdById,
+    });
     return this.toAccrualJson(created);
   }
 
   async deleteAccrual(driverId: string, period: string) {
     const periodDate = parsePeriod(period);
-    const accrual = await this.accrualModel.findOne({ where: { driverId, period: periodDate } });
+    const accrual = await this.accrualModel.findOne({
+      where: { driverId, period: periodDate },
+    });
     if (!accrual) throw new NotFoundException('Начисление не найдено');
     await accrual.destroy();
   }
@@ -65,7 +79,14 @@ export class PayrollService {
       const key = formatPeriod(periodDate);
       let row = periods.get(key);
       if (!row) {
-        row = { period: key, accruedWhiteMinor: 0, accruedBlackMinor: 0, paidWhiteMinor: 0, paidBlackMinor: 0, payments: [] };
+        row = {
+          period: key,
+          accruedWhiteMinor: 0,
+          accruedBlackMinor: 0,
+          paidWhiteMinor: 0,
+          paidBlackMinor: 0,
+          payments: [],
+        };
         periods.set(key, row);
       }
       return row;
@@ -80,7 +101,7 @@ export class PayrollService {
     for (const p of payments) {
       const row = ensure(p.period);
       const amount = toNumber(p.amountMinor);
-      if (p.channel === 'WHITE') row.paidWhiteMinor += amount;
+      if (p.channel === PayChannel.WHITE) row.paidWhiteMinor += amount;
       else row.paidBlackMinor += amount;
       row.payments.push(this.toPaymentJson(p));
     }
@@ -98,11 +119,18 @@ export class PayrollService {
     const where: Record<string, unknown> = { driverId };
     if (period) where.period = parsePeriod(period);
 
-    const rows = await this.paymentModel.findAll({ where, order: [['paidAt', 'DESC']] });
+    const rows = await this.paymentModel.findAll({
+      where,
+      order: [['paidAt', 'DESC']],
+    });
     return rows.map((p) => this.toPaymentJson(p));
   }
 
-  async createPayment(driverId: string, dto: CreatePaymentDto, createdById: string) {
+  async createPayment(
+    driverId: string,
+    dto: CreatePaymentDto,
+    createdById: string,
+  ) {
     const payment = await this.paymentModel.create({
       driverId,
       period: parsePeriod(dto.period),
@@ -135,7 +163,10 @@ export class PayrollService {
   async getTotalDueByDriver(driverIds: string[]): Promise<Map<string, number>> {
     if (driverIds.length === 0) return new Map();
 
-    const rows = await this.sequelize.query<{ driver_id: string; total_due_minor: string }>(
+    const rows = await this.sequelize.query<{
+      driver_id: string;
+      total_due_minor: string;
+    }>(
       `
       SELECT d.id AS driver_id,
              COALESCE(a.total_white, 0) + COALESCE(a.total_black, 0)

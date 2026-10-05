@@ -6,7 +6,9 @@ import { User, UserRole } from './database/models/user.model';
 
 function readArg(name: string): string | undefined {
   const prefix = `--${name}=`;
-  return process.argv.find((arg) => arg.startsWith(prefix))?.slice(prefix.length);
+  return process.argv
+    .find((arg) => arg.startsWith(prefix))
+    ?.slice(prefix.length);
 }
 
 async function main() {
@@ -15,7 +17,9 @@ async function main() {
   const fullName = readArg('fullName') ?? 'Админ';
 
   if (!email || !password) {
-    console.error('Использование: npm run seed:admin -- --email=admin@example.com --password=secret123 [--fullName="Имя Фамилия"]');
+    console.error(
+      'Использование: npm run seed:admin -- --email=admin@example.com --password=secret123 [--fullName="Имя Фамилия"]',
+    );
     process.exit(1);
   }
 

@@ -30,9 +30,39 @@ jobs:
       - name: Сборка backend и web
         run: docker compose build --progress=plain
 
+  backend:
+    name: Backend — линт и тесты
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Зависимости
+        run: npm ci --workspace=apps/backend
+
+      # package-lock.json собран на Windows, и npm не записал в него linux-бинарник
+      # unrs-resolver, без которого не стартует jest (npm/cli#4828) — ставим той же версии
+      - name: Нативный модуль для jest
+        run: |
+          V=$(node -p "require('./apps/backend/node_modules/unrs-resolver/package.json').version")
+          npm install --no-save --workspace=apps/backend "@unrs/resolver-binding-linux-x64-gnu@$V"
+
+      - name: Линт
+        run: npm run lint:check --workspace=apps/backend
+
+      - name: Тесты
+        run: npm test --workspace=apps/backend
+
   deploy:
     name: Деплой на сервер
-    needs: build
+    needs: [build, backend]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30

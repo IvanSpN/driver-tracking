@@ -1,5 +1,17 @@
-import { IsDateString, IsEnum, IsInt, IsOptional, IsString, Matches, Min } from 'class-validator';
-import { PayChannel, PaymentMethod, PaymentType } from '../../database/models/payment.model';
+import {
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  Min,
+} from 'class-validator';
+import {
+  PayChannel,
+  PaymentMethod,
+  PaymentType,
+} from '../../database/models/payment.model';
 
 export class UpdatePaymentDto {
   @IsOptional()

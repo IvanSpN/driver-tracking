@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/sequelize';
 import { QueryTypes, Sequelize } from 'sequelize';
 import { Shift } from '../database/models/shift.model';
@@ -18,7 +22,9 @@ function daysLeft(endDate: string | null): number | null {
   if (!endDate) return null;
   const end = new Date(`${endDate}T00:00:00Z`);
   const now = new Date();
-  const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const todayUtc = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
   return Math.round((end.getTime() - todayUtc.getTime()) / 86_400_000);
 }
 
@@ -31,7 +37,10 @@ export class ShiftsService {
   ) {}
 
   list(driverId: string) {
-    return this.shiftModel.findAll({ where: { driverId }, order: [['startDate', 'DESC']] });
+    return this.shiftModel.findAll({
+      where: { driverId },
+      order: [['startDate', 'DESC']],
+    });
   }
 
   async create(driverId: string, dto: CreateShiftDto) {
@@ -72,10 +81,17 @@ export class ShiftsService {
     await shift.destroy();
   }
 
-  async getCurrentShiftByDriver(driverIds: string[]): Promise<Map<string, CurrentShiftInfo>> {
+  async getCurrentShiftByDriver(
+    driverIds: string[],
+  ): Promise<Map<string, CurrentShiftInfo>> {
     if (driverIds.length === 0) return new Map();
 
-    const rows = await this.sequelize.query<{ driver_id: string; id: string; start_date: string; end_date: string | null }>(
+    const rows = await this.sequelize.query<{
+      driver_id: string;
+      id: string;
+      start_date: string;
+      end_date: string | null;
+    }>(
       `
       SELECT DISTINCT ON (driver_id) id, driver_id, start_date, end_date
       FROM shifts
@@ -90,7 +106,12 @@ export class ShiftsService {
     return new Map(
       rows.map((r) => [
         r.driver_id,
-        { id: r.id, startDate: r.start_date, endDate: r.end_date, daysLeft: daysLeft(r.end_date) },
+        {
+          id: r.id,
+          startDate: r.start_date,
+          endDate: r.end_date,
+          daysLeft: daysLeft(r.end_date),
+        },
       ]),
     );
   }
@@ -108,14 +129,25 @@ export class ShiftsService {
          WHERE driver_id = :driverId AND end_date IS NULL
            AND (:excludeId::uuid IS NULL OR id != :excludeId::uuid)
        ) AS "exists"`,
-      { replacements: { driverId, excludeId: excludeId ?? null }, type: QueryTypes.SELECT },
+      {
+        replacements: { driverId, excludeId: excludeId ?? null },
+        type: QueryTypes.SELECT,
+      },
     );
     if (rows[0].exists) {
-      throw new ConflictException({ message: 'У водителя уже есть открытая вахта', code: 'SHIFT_ALREADY_OPEN' });
+      throw new ConflictException({
+        message: 'У водителя уже есть открытая вахта',
+        code: 'SHIFT_ALREADY_OPEN',
+      });
     }
   }
 
-  private async assertNoOverlap(driverId: string, startDate: string, endDate: string | null, excludeId?: string) {
+  private async assertNoOverlap(
+    driverId: string,
+    startDate: string,
+    endDate: string | null,
+    excludeId?: string,
+  ) {
     const rows = await this.sequelize.query<{ exists: boolean }>(
       `SELECT EXISTS (
          SELECT 1 FROM shifts
@@ -124,10 +156,21 @@ export class ShiftsService {
            AND daterange(start_date, COALESCE(end_date, 'infinity'::date), '[]')
                && daterange(:startDate::date, COALESCE(:endDate::date, 'infinity'::date), '[]')
        ) AS "exists"`,
-      { replacements: { driverId, startDate, endDate, excludeId: excludeId ?? null }, type: QueryTypes.SELECT },
+      {
+        replacements: {
+          driverId,
+          startDate,
+          endDate,
+          excludeId: excludeId ?? null,
+        },
+        type: QueryTypes.SELECT,
+      },
     );
     if (rows[0].exists) {
-      throw new ConflictException({ message: 'Вахта пересекается с уже существующей', code: 'SHIFT_OVERLAP' });
+      throw new ConflictException({
+        message: 'Вахта пересекается с уже существующей',
+        code: 'SHIFT_OVERLAP',
+      });
     }
   }
 }

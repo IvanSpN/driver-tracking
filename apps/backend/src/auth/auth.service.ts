@@ -28,7 +28,8 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const user = await this.userModel.findOne({ where: { email: dto.email } });
-    if (!user || !user.isActive) throw new UnauthorizedException('Неверный email или пароль');
+    if (!user || !user.isActive)
+      throw new UnauthorizedException('Неверный email или пароль');
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Неверный email или пароль');
@@ -39,7 +40,10 @@ export class AuthService {
   async refresh(refreshToken: string) {
     let payload: AccessTokenPayload;
     try {
-      payload = jwt.verify(refreshToken, this.config.get<string>('JWT_REFRESH_SECRET')!) as AccessTokenPayload;
+      payload = jwt.verify(
+        refreshToken,
+        this.config.get<string>('JWT_REFRESH_SECRET')!,
+      ) as AccessTokenPayload;
     } catch {
       throw new UnauthorizedException();
     }
@@ -57,27 +61,47 @@ export class AuthService {
   }
 
   private issueTokens(user: User) {
-    const payload: AccessTokenPayload = { sub: user.id, email: user.email, role: user.role };
+    const payload: AccessTokenPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
 
-    const accessToken = jwt.sign(payload, this.config.get<string>('JWT_ACCESS_SECRET')!, {
-      expiresIn: this.getTtl('ACCESS_TTL', '15m'),
-    });
+    const accessToken = jwt.sign(
+      payload,
+      this.config.get<string>('JWT_ACCESS_SECRET')!,
+      {
+        expiresIn: this.getTtl('ACCESS_TTL', '15m'),
+      },
+    );
 
-    const refreshToken = jwt.sign(payload, this.config.get<string>('JWT_REFRESH_SECRET')!, {
-      expiresIn: this.getTtl('REFRESH_TTL', '30d'),
-    });
+    const refreshToken = jwt.sign(
+      payload,
+      this.config.get<string>('JWT_REFRESH_SECRET')!,
+      {
+        expiresIn: this.getTtl('REFRESH_TTL', '30d'),
+      },
+    );
 
     return { accessToken, refreshToken, user: this.sanitize(user) };
   }
 
   // env хранит длительность строкой ('15m'/'30d'); ms.StringValue из @types/jsonwebtoken
   // не выразить для значения, пришедшего из конфига, поэтому явный escape hatch.
-  private getTtl(key: 'ACCESS_TTL' | 'REFRESH_TTL', fallback: string): jwt.SignOptions['expiresIn'] {
+  private getTtl(
+    key: 'ACCESS_TTL' | 'REFRESH_TTL',
+    fallback: string,
+  ): jwt.SignOptions['expiresIn'] {
     const value = this.config.get<string>(key) ?? fallback;
     return value as unknown as jwt.SignOptions['expiresIn'];
   }
 
   private sanitize(user: User): SanitizedUser {
-    return { id: user.id, email: user.email, fullName: user.fullName, role: user.role };
+    return {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+    };
   }
 }

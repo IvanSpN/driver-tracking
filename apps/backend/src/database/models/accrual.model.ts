@@ -1,4 +1,14 @@
-import { Table, Column, Model, DataType, PrimaryKey, Default, AllowNull, ForeignKey, BelongsTo } from 'sequelize-typescript';
+import {
+  Table,
+  Column,
+  Model,
+  DataType,
+  PrimaryKey,
+  Default,
+  AllowNull,
+  ForeignKey,
+  BelongsTo,
+} from 'sequelize-typescript';
 import { Driver } from './driver.model';
 import { User } from './user.model';
 

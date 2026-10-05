@@ -1,3 +1,7 @@
+# Имя проекта фиксировано: от него зависит имя тома с базой (driver-tracking_pgdata),
+# и запуск из другого каталога не должен создать пустую базу
+name: driver-tracking
+
 services:
   db:
     image: postgres:16-alpine

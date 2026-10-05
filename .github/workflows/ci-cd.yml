@@ -1,0 +1,59 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Сборка образов
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Заглушки только для подстановки в docker-compose.yml — в образы они не попадают
+    env:
+      DB_PASSWORD: ci
+      JWT_ACCESS_SECRET: ci
+      JWT_REFRESH_SECRET: ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Проверка docker-compose.yml
+        run: docker compose config -q
+
+      # Те же Dockerfile, что и на сервере: nest build, vue-tsc и vite build
+      - name: Сборка backend и web
+        run: docker compose build --progress=plain
+
+  deploy:
+    name: Деплой на сервер
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - name: SSH-ключ
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      # Ключ на сервере ограничен командой: git reset до origin/main и deploy/deploy.sh
+      - name: Деплой
+        env:
+          SERVER: ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}
+        run: |
+          ssh -T -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=10 "$SERVER"

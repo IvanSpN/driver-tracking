@@ -35,20 +35,37 @@ export class PayrollService {
     createdById: string,
   ) {
     const periodDate = parsePeriod(period);
+    const driver = await this.driverModel.findByPk(driverId, {
+      paranoid: false,
+    });
+    if (!driver) throw new NotFoundException('Водитель не найден');
+
     const existing = await this.accrualModel.findOne({
       where: { driverId, period: periodDate },
     });
 
+    // Keep the existing storage format and payroll totals compatible with older records.
+    // An unchanged total must not reclassify an existing accrual.
+    const amounts =
+      existing &&
+      toNumber(existing.whiteMinor) + toNumber(existing.blackMinor) ===
+        dto.amountMinor
+        ? {}
+        : {
+            whiteMinor: driver.isOfficial ? dto.amountMinor : 0,
+            blackMinor: driver.isOfficial ? 0 : dto.amountMinor,
+          };
+    const values = { ...amounts, note: dto.note, createdById };
+
     if (existing) {
-      await existing.update({ ...dto, createdById });
+      await existing.update(values);
       return this.toAccrualJson(existing);
     }
 
     const created = await this.accrualModel.create({
       driverId,
       period: periodDate,
-      ...dto,
-      createdById,
+      ...values,
     });
     return this.toAccrualJson(created);
   }
@@ -210,6 +227,7 @@ export class PayrollService {
       id: a.id,
       driverId: a.driverId,
       period: formatPeriod(a.period),
+      amountMinor: toNumber(a.whiteMinor) + toNumber(a.blackMinor),
       whiteMinor: toNumber(a.whiteMinor),
       blackMinor: toNumber(a.blackMinor),
       note: a.note,

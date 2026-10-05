@@ -28,8 +28,7 @@ export interface PayrollPeriod {
 }
 
 export interface AccrualInput {
-  whiteMinor: number
-  blackMinor: number
+  amountMinor: number
   note?: string
 }
 

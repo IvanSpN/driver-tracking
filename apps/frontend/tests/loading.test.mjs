@@ -233,7 +233,7 @@ test('only dismissed drivers offer permanent deletion', async () => {
   }
 })
 
-test('payment form has no white/black selector when creating or editing', async () => {
+test('payment form offers white/black payment and restores the saved selection', async () => {
   const { default: component } = await server.ssrLoadModule('/src/components/PaymentFormModal.vue')
   for (const payment of [
     null,
@@ -254,9 +254,30 @@ test('payment form has no white/black selector when creating or editing', async 
         payment,
       }),
     )
-    assert.doesNotMatch(html, /value="(?:WHITE|BLACK)"/)
+    assert.match(html, /Оплата/)
+    assert.match(html, /<option[^>]*value="WHITE"[^>]*>Белая<\/option>/)
+    assert.match(html, /<option[^>]*value="BLACK"[^>]*>Чёрная<\/option>/)
+    const selected = (html.match(/<option\b[^>]*>/g) ?? []).find(
+      (option) => /value="(?:WHITE|BLACK)"/.test(option) && /\bselected\b/.test(option),
+    )
+    assert.ok(selected)
+    assert.ok(selected.includes(`value="${payment?.channel ?? 'WHITE'}"`))
     assert.match(html, /Зарплата/)
     assert.match(html, /Сумма, ₽/)
+  }
+})
+
+test('monthly accrual form displays one amount without white/black fields', async () => {
+  const { default: component } = await server.ssrLoadModule('/src/components/AccrualFormModal.vue')
+  for (const initial of [null, { period: '2026-10', amountMinor: 123456, note: 'За месяц' }]) {
+    const html = await renderToString(createSSRApp(component, { open: true, initial }))
+    assert.match(html, /Сумма за месяц, ₽/)
+    assert.doesNotMatch(html, /Белая|Чёрная|Черная/)
+    const amountInputs = (html.match(/<input\b[^>]*>/g) ?? []).filter((input) =>
+      input.includes('type="number"'),
+    )
+    assert.equal(amountInputs.length, 1)
+    assert.match(amountInputs[0], initial ? /value="1234\.56"/ : /value="0"/)
   }
 })
 

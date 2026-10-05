@@ -10,6 +10,7 @@ import {
 } from '../database/models/payment.model';
 import { PayrollService } from './payroll.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import { UpsertAccrualDto } from './dto/upsert-accrual.dto';
 
 describe('PayrollService payment channel', () => {
   const payment = {
@@ -92,4 +93,115 @@ describe('PayrollService payment channel', () => {
       await validate(Object.assign(new CreatePaymentDto(), input)),
     ).toEqual([]);
   });
+});
+
+describe('PayrollService monthly accrual amount', () => {
+  const accrual = {
+    id: 'accrual-id',
+    driverId: 'driver-id',
+    period: '2026-10-01',
+    whiteMinor: '60000',
+    blackMinor: '40000',
+    note: null,
+    update: jest.fn(),
+  };
+  const accruals = { findOne: jest.fn(), create: jest.fn() };
+  const drivers = { findByPk: jest.fn() };
+  const service = new PayrollService(
+    accruals as unknown as typeof Accrual,
+    {} as typeof Payment,
+    drivers as unknown as typeof Driver,
+    {} as Sequelize,
+  );
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    accrual.whiteMinor = '60000';
+    accrual.blackMinor = '40000';
+    drivers.findByPk.mockResolvedValue({ isOfficial: true });
+    accruals.findOne.mockResolvedValue(null);
+    accruals.create.mockImplementation(
+      (values: { whiteMinor: number; blackMinor: number }) =>
+        Promise.resolve({
+          ...accrual,
+          whiteMinor: String(values.whiteMinor),
+          blackMinor: String(values.blackMinor),
+        }),
+    );
+    accrual.update.mockImplementation(
+      (values: { whiteMinor?: number; blackMinor?: number }) => {
+        if (values.whiteMinor !== undefined)
+          accrual.whiteMinor = String(values.whiteMinor);
+        if (values.blackMinor !== undefined)
+          accrual.blackMinor = String(values.blackMinor);
+        return Promise.resolve(accrual);
+      },
+    );
+  });
+
+  it.each([true, false])(
+    'saves one total for either driver status (%s)',
+    async (isOfficial) => {
+      drivers.findByPk.mockResolvedValue({ isOfficial });
+      const result = await service.upsertAccrual(
+        'driver-id',
+        '2026-10',
+        { amountMinor: 123456 },
+        'user-id',
+      );
+      expect(result.amountMinor).toBe(123456);
+      expect(result.whiteMinor + result.blackMinor).toBe(123456);
+    },
+  );
+
+  it('preserves both parts of a historical accrual when its total is unchanged', async () => {
+    accruals.findOne.mockResolvedValue(accrual);
+    const result = await service.upsertAccrual(
+      'driver-id',
+      '2026-10',
+      { amountMinor: 100000, note: 'Заметка' },
+      'user-id',
+    );
+    expect(result.amountMinor).toBe(100000);
+    expect(accrual.update).toHaveBeenCalledWith({
+      note: 'Заметка',
+      createdById: 'user-id',
+    });
+    expect(result.whiteMinor).toBe(60000);
+    expect(result.blackMinor).toBe(40000);
+  });
+
+  it('replaces a historical split with the new total without counting any part twice', async () => {
+    accruals.findOne.mockResolvedValue(accrual);
+    const result = await service.upsertAccrual(
+      'driver-id',
+      '2026-10',
+      { amountMinor: 75050 },
+      'user-id',
+    );
+    expect(result.amountMinor).toBe(75050);
+    expect(result.whiteMinor + result.blackMinor).toBe(75050);
+    expect(accruals.create).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 123456])(
+    'accepts a single non-negative amount: %s',
+    async (amountMinor) => {
+      expect(
+        await validate(Object.assign(new UpsertAccrualDto(), { amountMinor })),
+      ).toEqual([]);
+    },
+  );
+
+  it.each([undefined, -1, 1.5])(
+    'rejects a missing, negative or fractional amount: %s',
+    async (amountMinor) => {
+      const errors = await validate(
+        Object.assign(new UpsertAccrualDto(), { amountMinor }),
+      );
+      expect(errors.some((error) => error.property === 'amountMinor')).toBe(
+        true,
+      );
+    },
+  );
 });

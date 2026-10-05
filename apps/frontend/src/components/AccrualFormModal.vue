@@ -2,11 +2,11 @@
 import { reactive, watch } from 'vue'
 import BaseModal from './BaseModal.vue'
 import LoadingButton from './LoadingButton.vue'
+import type { AccrualInput } from '../api/payroll'
 
 export interface AccrualFormValue {
   period: string
-  whiteMinor: number
-  blackMinor: number
+  amountMinor: number
   note: string | null
 }
 
@@ -18,13 +18,12 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   close: []
-  save: [value: { period: string; whiteMinor: number; blackMinor: number; note?: string }]
+  save: [value: AccrualInput & { period: string }]
 }>()
 
 const form = reactive({
   period: '',
-  whiteRub: 0,
-  blackRub: 0,
+  amountRub: 0,
   note: '',
 })
 
@@ -33,8 +32,7 @@ watch(
   ([open, initial]) => {
     if (!open) return
     form.period = initial?.period ?? ''
-    form.whiteRub = (initial?.whiteMinor ?? 0) / 100
-    form.blackRub = (initial?.blackMinor ?? 0) / 100
+    form.amountRub = (initial?.amountMinor ?? 0) / 100
     form.note = initial?.note ?? ''
   },
   { immediate: true },
@@ -44,8 +42,7 @@ function submit() {
   if (props.saving) return
   emit('save', {
     period: form.period,
-    whiteMinor: Math.round(form.whiteRub * 100),
-    blackMinor: Math.round(form.blackRub * 100),
+    amountMinor: Math.round(form.amountRub * 100),
     note: form.note || undefined,
   })
 }
@@ -67,13 +64,8 @@ function submit() {
         </label>
 
         <label class="field">
-          <span>Белая, ₽</span>
-          <input v-model.number="form.whiteRub" type="number" min="0" step="1" required />
-        </label>
-
-        <label class="field">
-          <span>Чёрная, ₽</span>
-          <input v-model.number="form.blackRub" type="number" min="0" step="1" required />
+          <span>Сумма за месяц, ₽</span>
+          <input v-model.number="form.amountRub" type="number" min="0" step="0.01" required />
         </label>
 
         <label class="field">

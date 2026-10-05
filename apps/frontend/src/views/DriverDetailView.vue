@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import * as driversApi from '../api/drivers'
 import type { Driver } from '../api/drivers'
 import * as payrollApi from '../api/payroll'
-import type { PayrollPeriod, Payment, PaymentInput } from '../api/payroll'
+import type { AccrualInput, PayrollPeriod, Payment, PaymentInput } from '../api/payroll'
 import * as shiftsApi from '../api/shifts'
 import type { Shift, ShiftInput } from '../api/shifts'
 import AccrualFormModal from '../components/AccrualFormModal.vue'
@@ -106,20 +106,14 @@ function openAccrualModal(period?: PayrollPeriod) {
   accrualModalInitial.value = period
     ? {
         period: period.period,
-        whiteMinor: period.accruedWhiteMinor,
-        blackMinor: period.accruedBlackMinor,
+        amountMinor: period.accruedWhiteMinor + period.accruedBlackMinor,
         note: null,
       }
-    : { period: currentPeriod(), whiteMinor: 0, blackMinor: 0, note: null }
+    : { period: currentPeriod(), amountMinor: 0, note: null }
   accrualModalOpen.value = true
 }
 
-async function handleAccrualSave(input: {
-  period: string
-  whiteMinor: number
-  blackMinor: number
-  note?: string
-}) {
+async function handleAccrualSave(input: AccrualInput & { period: string }) {
   if (actionsDisabled.value) return
   await run('save-accrual', async () => {
     await payrollApi.upsertAccrual(driverId, input.period, input)
@@ -344,17 +338,6 @@ function toggleExpand(period: string) {
             </div>
 
             <div v-if="expandedPeriod === p.period" class="payments-block">
-              <div class="channel-breakdown">
-                <div>
-                  Белая: начислено {{ formatMoney(p.accruedWhiteMinor) }}, выплачено
-                  {{ formatMoney(p.paidWhiteMinor) }}, остаток {{ formatMoney(p.dueWhiteMinor) }}
-                </div>
-                <div>
-                  Чёрная: начислено {{ formatMoney(p.accruedBlackMinor) }}, выплачено
-                  {{ formatMoney(p.paidBlackMinor) }}, остаток {{ formatMoney(p.dueBlackMinor) }}
-                </div>
-              </div>
-
               <p v-if="p.payments.length === 0" class="empty-state">Выплат ещё не было.</p>
               <ul v-else class="payment-rows">
                 <li v-for="payment in p.payments" :key="payment.id" class="payment-row">
@@ -599,15 +582,6 @@ function toggleExpand(period: string) {
 .payments-block {
   padding: 12px 14px;
   border-top: 1px solid var(--border);
-}
-
-.channel-breakdown {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin-bottom: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
 
 .payment-rows {

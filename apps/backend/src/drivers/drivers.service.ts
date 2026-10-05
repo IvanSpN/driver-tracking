@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Op } from 'sequelize';
 import { Driver } from '../database/models/driver.model';
@@ -50,6 +55,23 @@ export class DriversService {
   async remove(id: string) {
     const driver = await this.findOne(id);
     await driver.destroy();
+  }
+
+  async deletePermanently(id: string) {
+    const driver = await this.findOne(id);
+    if (!driver.isSoftDeleted()) {
+      throw new BadRequestException('Удалить можно только уволенного водителя');
+    }
+
+    // Check the status in DELETE too, in case another request restored the driver.
+    // Related shifts, accruals and payments are removed by the database's CASCADE constraints.
+    const deleted = await this.driverModel.destroy({
+      where: { id, deletedAt: { [Op.ne]: null } },
+      force: true,
+    });
+    if (!deleted) {
+      throw new ConflictException('Статус водителя изменился. Обновите список');
+    }
   }
 
   async restore(id: string) {

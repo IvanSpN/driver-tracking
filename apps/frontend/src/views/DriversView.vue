@@ -62,6 +62,20 @@ async function handleRestore(driver: Driver) {
   })
 }
 
+async function handleDeletePermanently(driver: Driver) {
+  if (actionsDisabled.value || !driver.deletedAt) return
+  if (
+    !confirm(
+      `Удалить ${driver.lastName} ${driver.firstName} навсегда?\n\nБудут удалены все вахты, начисления и выплаты этого водителя. Восстановить данные будет невозможно.`,
+    )
+  )
+    return
+  await run(`delete:${driver.id}`, async () => {
+    await store.deletePermanently(driver.id)
+    await store.fetchList()
+  })
+}
+
 function changeFilter(filter: OfficialFilter) {
   if (busy.value || (store.officialFilter === filter && !store.error)) return
   store.officialFilter = filter
@@ -145,6 +159,7 @@ function changeFilter(filter: OfficialFilter) {
           <span class="badge" :class="driver.isOfficial ? 'badge-outline' : 'badge-solid'">
             {{ driver.isOfficial ? 'белая' : 'чёрная' }}
           </span>
+          <span v-if="driver.deletedAt" class="badge badge-dismissed">Уволен</span>
           <span v-if="driver.phone" class="driver-phone">{{ driver.phone }}</span>
           <span v-if="driver.currentShift" class="driver-shift">
             на вахте{{
@@ -190,6 +205,14 @@ function changeFilter(filter: OfficialFilter) {
               loading-text="Восстанавливаем…"
               @click="handleRestore(driver)"
               >Восстановить</LoadingButton
+            >
+            <LoadingButton
+              class="btn-link danger"
+              :disabled="actionsDisabled"
+              :loading="activeAction === `delete:${driver.id}`"
+              loading-text="Удаляем…"
+              @click="handleDeletePermanently(driver)"
+              >Удалить навсегда</LoadingButton
             >
           </template>
         </div>
@@ -345,6 +368,12 @@ function changeFilter(filter: OfficialFilter) {
 
 .driver-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
+}
+
+.badge-dismissed {
+  border: 1px solid var(--border);
+  color: var(--text-muted);
 }
 </style>

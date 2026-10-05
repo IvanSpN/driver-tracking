@@ -11,7 +11,12 @@ export interface Driver {
   deletedAt: string | null
   // приходит только со списка (GET /drivers)
   totalDueMinor?: number
-  currentShift?: { id: string; startDate: string; endDate: string | null; daysLeft: number | null } | null
+  currentShift?: {
+    id: string
+    startDate: string
+    endDate: string | null
+    daysLeft: number | null
+  } | null
 }
 
 export interface DriverListFilter {
@@ -53,4 +58,8 @@ export function deleteDriver(id: string) {
 
 export function restoreDriver(id: string) {
   return apiClient.post<Driver>(`/drivers/${id}/restore`)
+}
+
+export function deleteDriverPermanently(id: string) {
+  return apiClient.delete(`/drivers/${id}/permanent`)
 }

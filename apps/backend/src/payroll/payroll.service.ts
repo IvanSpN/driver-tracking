@@ -3,6 +3,7 @@ import { InjectModel, InjectConnection } from '@nestjs/sequelize';
 import { Op, QueryTypes, Sequelize } from 'sequelize';
 import { Accrual } from '../database/models/accrual.model';
 import { PayChannel, Payment } from '../database/models/payment.model';
+import { Driver } from '../database/models/driver.model';
 import { UpsertAccrualDto } from './dto/upsert-accrual.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
@@ -23,6 +24,7 @@ export class PayrollService {
   constructor(
     @InjectModel(Accrual) private readonly accrualModel: typeof Accrual,
     @InjectModel(Payment) private readonly paymentModel: typeof Payment,
+    @InjectModel(Driver) private readonly driverModel: typeof Driver,
     @InjectConnection() private readonly sequelize: Sequelize,
   ) {}
 
@@ -131,10 +133,17 @@ export class PayrollService {
     dto: CreatePaymentDto,
     createdById: string,
   ) {
+    const driver = await this.driverModel.findByPk(driverId, {
+      paranoid: false,
+    });
+    if (!driver) throw new NotFoundException('Водитель не найден');
+
     const payment = await this.paymentModel.create({
       driverId,
       period: parsePeriod(dto.period),
-      channel: dto.channel,
+      channel:
+        dto.channel ??
+        (driver.isOfficial ? PayChannel.WHITE : PayChannel.BLACK),
       type: dto.type,
       amountMinor: dto.amountMinor,
       paidAt: dto.paidAt,

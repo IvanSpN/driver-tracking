@@ -35,7 +35,7 @@ export interface AccrualInput {
 
 export interface PaymentInput {
   period: string
-  channel: PayChannel
+  channel?: PayChannel
   type: PaymentType
   amountMinor: number
   paidAt: string

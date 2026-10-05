@@ -77,4 +77,10 @@ export class DriversController {
   restore(@Param('id') id: string) {
     return this.driversService.restore(id);
   }
+
+  @Delete(':id/permanent')
+  @HttpCode(204)
+  deletePermanently(@Param('id') id: string) {
+    return this.driversService.deletePermanently(id);
+  }
 }

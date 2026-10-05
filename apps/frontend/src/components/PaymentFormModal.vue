@@ -2,7 +2,7 @@
 import { reactive, watch } from 'vue'
 import BaseModal from './BaseModal.vue'
 import LoadingButton from './LoadingButton.vue'
-import type { Payment, PayChannel, PaymentType, PaymentMethod, PaymentInput } from '../api/payroll'
+import type { Payment, PaymentType, PaymentMethod, PaymentInput } from '../api/payroll'
 
 const props = defineProps<{
   open: boolean
@@ -18,7 +18,6 @@ const emit = defineEmits<{
 
 const form = reactive({
   period: '',
-  channel: 'WHITE' as PayChannel,
   type: 'ADVANCE' as PaymentType,
   amountRub: 0,
   paidAt: '',
@@ -36,7 +35,6 @@ watch(
     if (!open) return
     if (payment) {
       form.period = payment.period
-      form.channel = payment.channel
       form.type = payment.type
       form.amountRub = payment.amountMinor / 100
       form.paidAt = payment.paidAt
@@ -44,7 +42,6 @@ watch(
       form.note = payment.note ?? ''
     } else {
       form.period = defaultPeriod
-      form.channel = 'WHITE'
       form.type = 'ADVANCE'
       form.amountRub = 0
       form.paidAt = todayIso()
@@ -59,7 +56,6 @@ function submit() {
   if (props.saving) return
   emit('save', {
     period: form.period,
-    channel: form.channel,
     type: form.type,
     amountMinor: Math.round(form.amountRub * 100),
     paidAt: form.paidAt,
@@ -82,14 +78,6 @@ function submit() {
         <label class="field">
           <span>Месяц</span>
           <input v-model="form.period" type="month" required />
-        </label>
-
-        <label class="field">
-          <span>Канал</span>
-          <select v-model="form.channel">
-            <option value="WHITE">Белая</option>
-            <option value="BLACK">Чёрная</option>
-          </select>
         </label>
 
         <label class="field">

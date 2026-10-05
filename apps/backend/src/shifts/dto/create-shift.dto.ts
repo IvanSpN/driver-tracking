@@ -1,12 +1,21 @@
-import { IsDateString, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsOptional, IsString, Matches } from 'class-validator';
 
 export class CreateShiftDto {
-  @IsDateString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
+    message: 'Дата начала должна быть в формате ГГГГ-ММ-ДД',
+  })
+  @IsDateString({ strict: true }, { message: 'Укажите корректную дату начала' })
   startDate: string;
 
   @IsOptional()
-  @IsDateString()
-  endDate?: string;
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
+    message: 'Дата окончания должна быть в формате ГГГГ-ММ-ДД',
+  })
+  @IsDateString(
+    { strict: true },
+    { message: 'Укажите корректную дату окончания' },
+  )
+  endDate?: string | null;
 
   @IsOptional()
   @IsString()

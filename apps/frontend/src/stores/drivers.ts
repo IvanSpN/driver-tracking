@@ -49,6 +49,11 @@ export const useDriversStore = defineStore('drivers', () => {
     await driversApi.restoreDriver(id)
   }
 
+  async function deletePermanently(id: string) {
+    await driversApi.deleteDriverPermanently(id)
+    drivers.value = drivers.value.filter((driver) => driver.id !== id)
+  }
+
   return {
     drivers,
     loading,
@@ -60,5 +65,6 @@ export const useDriversStore = defineStore('drivers', () => {
     update,
     remove,
     restore,
+    deletePermanently,
   }
 })

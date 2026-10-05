@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import BaseModal from './BaseModal.vue'
 import LoadingButton from './LoadingButton.vue'
 import type { Shift, ShiftInput } from '../api/shifts'
@@ -22,8 +22,15 @@ const form = reactive({
 })
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
+
+const dateError = computed(() =>
+  form.endDate && form.startDate && form.endDate < form.startDate
+    ? 'Дата окончания вахты не может быть раньше даты начала'
+    : '',
+)
 
 watch(
   () => [props.open, props.shift] as const,
@@ -37,10 +44,10 @@ watch(
 )
 
 function submit() {
-  if (props.saving) return
+  if (props.saving || dateError.value || !form.startDate) return
   emit('save', {
     startDate: form.startDate,
-    endDate: form.endDate || undefined,
+    endDate: form.endDate || null,
     note: form.note || undefined,
   })
 }
@@ -58,13 +65,15 @@ function submit() {
       <fieldset class="form form-fields" :disabled="saving">
         <label class="field">
           <span>Дата начала</span>
-          <input v-model="form.startDate" type="date" required />
+          <input v-model="form.startDate" type="date" :max="form.endDate || undefined" required />
         </label>
 
         <label class="field">
           <span>Дата окончания (если известна)</span>
-          <input v-model="form.endDate" type="date" />
+          <input v-model="form.endDate" type="date" :min="form.startDate || undefined" />
         </label>
+
+        <p v-if="dateError" class="error-message" role="alert">{{ dateError }}</p>
 
         <label class="field">
           <span>Заметка</span>
@@ -77,6 +86,7 @@ function submit() {
             type="submit"
             class="btn-primary"
             :loading="saving"
+            :disabled="!!dateError"
             loading-text="Сохраняем…"
             >Сохранить</LoadingButton
           >

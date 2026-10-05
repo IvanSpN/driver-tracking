@@ -7,6 +7,7 @@ import { AxiosError, CanceledError } from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
 import { createSSRApp } from 'vue'
 import { renderToString } from '@vue/server-renderer'
+import { createMemoryHistory, createRouter } from 'vue-router'
 
 let server
 let apiClient
@@ -205,4 +206,78 @@ test('errors explain timeouts and preserve server validation messages', () => {
     status: 400,
   })
   assert.equal(getErrorMessage(error), 'Проверьте дату')
+})
+
+test('only dismissed drivers offer permanent deletion', async () => {
+  const { default: component } = await server.ssrLoadModule('/src/views/DriversView.vue')
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/drivers/:id?', name: 'driver-detail', component }],
+  })
+  await router.push('/drivers')
+  for (const dismissed of [false, true]) {
+    const pinia = createPinia()
+    const app = createSSRApp(component).use(pinia).use(router)
+    const store = useDriversStore(pinia)
+    store.drivers = [
+      {
+        id: 'driver-id',
+        lastName: 'Тестовый',
+        firstName: 'Водитель',
+        deletedAt: dismissed ? '2026-10-05' : null,
+      },
+    ]
+    const html = await renderToString(app)
+    assert.equal(html.includes('Удалить навсегда'), dismissed)
+    assert.equal(html.includes('Восстановить'), dismissed)
+  }
+})
+
+test('payment form has no white/black selector when creating or editing', async () => {
+  const { default: component } = await server.ssrLoadModule('/src/components/PaymentFormModal.vue')
+  for (const payment of [
+    null,
+    {
+      period: '2026-10',
+      channel: 'BLACK',
+      type: 'SALARY',
+      amountMinor: 10000,
+      paidAt: '2026-10-05',
+      method: 'CASH',
+      note: null,
+    },
+  ]) {
+    const html = await renderToString(
+      createSSRApp(component, {
+        open: true,
+        defaultPeriod: '2026-10',
+        payment,
+      }),
+    )
+    assert.doesNotMatch(html, /value="(?:WHITE|BLACK)"/)
+    assert.match(html, /Зарплата/)
+    assert.match(html, /Сумма, ₽/)
+  }
+})
+
+test('editing a shift exposes both dates and prevents an invalid range', async () => {
+  const { default: component } = await server.ssrLoadModule('/src/components/ShiftFormModal.vue')
+  const shift = { startDate: '2026-10-01', endDate: '2026-10-15', note: '' }
+  const html = await renderToString(createSSRApp(component, { open: true, shift }))
+  const inputs = html.match(/<input\b[^>]*>/g) ?? []
+  const startInput = inputs.find((input) => input.includes('max=')) ?? ''
+  const endInput = inputs.find((input) => input.includes('min=')) ?? ''
+  assert.match(startInput, /value="2026-10-01"/)
+  assert.match(startInput, /max="2026-10-15"/)
+  assert.match(endInput, /value="2026-10-15"/)
+  assert.match(endInput, /min="2026-10-01"/)
+
+  const invalid = await renderToString(
+    createSSRApp(component, {
+      open: true,
+      shift: { ...shift, endDate: '2026-09-30' },
+    }),
+  )
+  assert.match(invalid, /Дата окончания вахты не может быть раньше даты начала/)
+  assert.match(invalid, /<button[^>]*type="submit"[^>]*disabled/)
 })

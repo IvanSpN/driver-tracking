@@ -265,7 +265,7 @@ function toggleExpand(period: string) {
                 :disabled="actionsDisabled"
                 @click="openShiftModal(shift)"
               >
-                {{ shift.endDate ? 'изменить' : 'закрыть вахту' }}
+                Изменить даты / вахту
               </button>
               <LoadingButton
                 class="btn-link danger"

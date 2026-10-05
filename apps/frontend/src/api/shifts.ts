@@ -11,7 +11,7 @@ export interface Shift {
 
 export interface ShiftInput {
   startDate: string
-  endDate?: string
+  endDate?: string | null
   note?: string
 }
 

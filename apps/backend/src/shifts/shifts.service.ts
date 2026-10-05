@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -48,6 +49,7 @@ export class ShiftsService {
     if (!driver) throw new NotFoundException('Водитель не найден');
 
     const endDate = dto.endDate ?? null;
+    this.assertDateOrder(dto.startDate, endDate);
     if (!endDate) await this.assertNoOpenShift(driverId);
     await this.assertNoOverlap(driverId, dto.startDate, endDate);
 
@@ -64,6 +66,8 @@ export class ShiftsService {
     const shift = await this.findOrFail(id);
     const startDate = dto.startDate ?? shift.startDate;
     const endDate = dto.endDate !== undefined ? dto.endDate : shift.endDate;
+
+    this.assertDateOrder(startDate, endDate);
 
     if (!endDate) await this.assertNoOpenShift(shift.driverId, id);
     await this.assertNoOverlap(shift.driverId, startDate, endDate, id);
@@ -120,6 +124,14 @@ export class ShiftsService {
     const shift = await this.shiftModel.findByPk(id);
     if (!shift) throw new NotFoundException('Вахта не найдена');
     return shift;
+  }
+
+  private assertDateOrder(startDate: string, endDate: string | null) {
+    if (endDate && endDate < startDate) {
+      throw new BadRequestException(
+        'Дата окончания вахты не может быть раньше даты начала',
+      );
+    }
   }
 
   private async assertNoOpenShift(driverId: string, excludeId?: string) {

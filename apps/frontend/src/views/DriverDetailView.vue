@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as driversApi from '../api/drivers'
 import type { Driver } from '../api/drivers'
@@ -11,6 +11,10 @@ import AccrualFormModal from '../components/AccrualFormModal.vue'
 import type { AccrualFormValue } from '../components/AccrualFormModal.vue'
 import PaymentFormModal from '../components/PaymentFormModal.vue'
 import ShiftFormModal from '../components/ShiftFormModal.vue'
+import LoadingButton from '../components/LoadingButton.vue'
+import LoadingState from '../components/LoadingState.vue'
+import { useAsyncAction } from '../composables/useAsyncAction'
+import { getErrorMessage } from '../utils/errors'
 import { formatMoney } from '../utils/money'
 
 const route = useRoute()
@@ -21,6 +25,9 @@ const driver = ref<Driver | null>(null)
 const periods = ref<PayrollPeriod[]>([])
 const shifts = ref<Shift[]>([])
 const loading = ref(false)
+const loadError = ref('')
+const { activeAction, pending, error, run } = useAsyncAction()
+const actionsDisabled = computed(() => loading.value || pending.value || !!loadError.value)
 const tab = ref<'overview' | 'shifts' | 'payroll'>('overview')
 const expandedPeriod = ref<string | null>(null)
 
@@ -39,22 +46,24 @@ function currentPeriod(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 }
 
-function extractErrorMessage(e: unknown): string {
-  const message = (e as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message
-  return (Array.isArray(message) ? message[0] : message) ?? 'Не удалось выполнить запрос'
-}
-
 async function load() {
+  if (loading.value) return
   loading.value = true
+  loadError.value = ''
   try {
-    const [driverRes, payrollRes, shiftsRes] = await Promise.all([
+    const [driverRes, payrollRes, shiftsRes] = await Promise.allSettled([
       driversApi.fetchDriver(driverId),
       payrollApi.fetchPayroll(driverId),
       shiftsApi.fetchShifts(driverId),
     ])
-    driver.value = driverRes.data
-    periods.value = payrollRes.data
-    shifts.value = shiftsRes.data
+    if (driverRes.status === 'rejected') throw driverRes.reason
+    if (payrollRes.status === 'rejected') throw payrollRes.reason
+    if (shiftsRes.status === 'rejected') throw shiftsRes.reason
+    driver.value = driverRes.value.data
+    periods.value = payrollRes.value.data
+    shifts.value = shiftsRes.value.data
+  } catch (cause) {
+    loadError.value = getErrorMessage(cause)
   } finally {
     loading.value = false
   }
@@ -63,12 +72,15 @@ async function load() {
 onMounted(load)
 
 function openShiftModal(shift?: Shift) {
+  if (actionsDisabled.value) return
+  error.value = ''
   editingShift.value = shift ?? null
   shiftModalOpen.value = true
 }
 
 async function handleShiftSave(input: ShiftInput) {
-  try {
+  if (actionsDisabled.value) return
+  await run('save-shift', async () => {
     if (editingShift.value) {
       await shiftsApi.updateShift(editingShift.value.id, input)
     } else {
@@ -76,61 +88,90 @@ async function handleShiftSave(input: ShiftInput) {
     }
     shiftModalOpen.value = false
     await load()
-  } catch (e) {
-    alert(extractErrorMessage(e))
-  }
+  })
 }
 
 async function handleDeleteShift(shift: Shift) {
+  if (actionsDisabled.value) return
   if (!confirm('Удалить эту вахту?')) return
-  await shiftsApi.deleteShift(shift.id)
-  await load()
+  await run(`delete-shift:${shift.id}`, async () => {
+    await shiftsApi.deleteShift(shift.id)
+    await load()
+  })
 }
 
 function openAccrualModal(period?: PayrollPeriod) {
+  if (actionsDisabled.value) return
+  error.value = ''
   accrualModalInitial.value = period
-    ? { period: period.period, whiteMinor: period.accruedWhiteMinor, blackMinor: period.accruedBlackMinor, note: null }
+    ? {
+        period: period.period,
+        whiteMinor: period.accruedWhiteMinor,
+        blackMinor: period.accruedBlackMinor,
+        note: null,
+      }
     : { period: currentPeriod(), whiteMinor: 0, blackMinor: 0, note: null }
   accrualModalOpen.value = true
 }
 
-async function handleAccrualSave(input: { period: string; whiteMinor: number; blackMinor: number; note?: string }) {
-  await payrollApi.upsertAccrual(driverId, input.period, input)
-  accrualModalOpen.value = false
-  await load()
+async function handleAccrualSave(input: {
+  period: string
+  whiteMinor: number
+  blackMinor: number
+  note?: string
+}) {
+  if (actionsDisabled.value) return
+  await run('save-accrual', async () => {
+    await payrollApi.upsertAccrual(driverId, input.period, input)
+    accrualModalOpen.value = false
+    await load()
+  })
 }
 
 async function handleDeleteAccrual(period: PayrollPeriod) {
+  if (actionsDisabled.value) return
   if (!confirm(`Удалить начисление за ${period.period}?`)) return
-  await payrollApi.deleteAccrual(driverId, period.period)
-  await load()
+  await run(`delete-accrual:${period.period}`, async () => {
+    await payrollApi.deleteAccrual(driverId, period.period)
+    await load()
+  })
 }
 
 function openPaymentModal(period?: string) {
+  if (actionsDisabled.value) return
+  error.value = ''
   editingPayment.value = null
   paymentDefaultPeriod.value = period ?? currentPeriod()
   paymentModalOpen.value = true
 }
 
 function openEditPayment(payment: Payment) {
+  if (actionsDisabled.value) return
+  error.value = ''
   editingPayment.value = payment
   paymentModalOpen.value = true
 }
 
 async function handlePaymentSave(input: PaymentInput) {
-  if (editingPayment.value) {
-    await payrollApi.updatePayment(editingPayment.value.id, input)
-  } else {
-    await payrollApi.createPayment(driverId, input)
-  }
-  paymentModalOpen.value = false
-  await load()
+  if (actionsDisabled.value) return
+  await run('save-payment', async () => {
+    if (editingPayment.value) {
+      await payrollApi.updatePayment(editingPayment.value.id, input)
+    } else {
+      await payrollApi.createPayment(driverId, input)
+    }
+    paymentModalOpen.value = false
+    await load()
+  })
 }
 
 async function handleDeletePayment(payment: Payment) {
+  if (actionsDisabled.value) return
   if (!confirm('Удалить эту выплату?')) return
-  await payrollApi.deletePayment(payment.id)
-  await load()
+  await run(`delete-payment:${payment.id}`, async () => {
+    await payrollApi.deletePayment(payment.id)
+    await load()
+  })
 }
 
 function toggleExpand(period: string) {
@@ -140,15 +181,42 @@ function toggleExpand(period: string) {
 
 <template>
   <div class="page">
-    <button type="button" class="back-link" @click="router.push({ name: 'drivers' })">← Водители</button>
+    <button type="button" class="back-link" @click="router.push({ name: 'drivers' })">
+      ← Водители
+    </button>
+
+    <LoadingState
+      v-if="loading"
+      :compact="!!driver"
+      :label="driver ? 'Обновляем данные водителя…' : 'Загружаем карточку водителя…'"
+    />
+    <div v-if="loadError" class="request-error" role="alert">
+      <p class="error-message">Не удалось загрузить данные водителя. {{ loadError }}</p>
+      <button class="btn-secondary" :disabled="loading || pending" @click="load">
+        Повторить загрузку
+      </button>
+    </div>
+    <p
+      v-if="error && !shiftModalOpen && !accrualModalOpen && !paymentModalOpen"
+      class="error-message"
+      role="alert"
+    >
+      {{ error }}
+    </p>
 
     <template v-if="driver">
       <h1>{{ driver.lastName }} {{ driver.firstName }} {{ driver.middleName }}</h1>
 
       <div class="tabs">
-        <button type="button" :class="{ active: tab === 'overview' }" @click="tab = 'overview'">Обзор</button>
-        <button type="button" :class="{ active: tab === 'shifts' }" @click="tab = 'shifts'">Вахты</button>
-        <button type="button" :class="{ active: tab === 'payroll' }" @click="tab = 'payroll'">Зарплата</button>
+        <button type="button" :class="{ active: tab === 'overview' }" @click="tab = 'overview'">
+          Обзор
+        </button>
+        <button type="button" :class="{ active: tab === 'shifts' }" @click="tab = 'shifts'">
+          Вахты
+        </button>
+        <button type="button" :class="{ active: tab === 'payroll' }" @click="tab = 'payroll'">
+          Зарплата
+        </button>
       </div>
 
       <section v-if="tab === 'overview'" class="overview">
@@ -170,22 +238,43 @@ function toggleExpand(period: string) {
 
       <section v-else-if="tab === 'shifts'" class="shifts">
         <div class="shifts-actions">
-          <button type="button" class="btn-primary" @click="openShiftModal()">Новая вахта</button>
+          <button
+            type="button"
+            class="btn-primary"
+            :disabled="actionsDisabled"
+            @click="openShiftModal()"
+          >
+            Новая вахта
+          </button>
         </div>
 
         <p v-if="shifts.length === 0" class="empty-state">Вахт пока не было.</p>
 
         <ul v-else class="shift-list">
           <li v-for="shift in shifts" :key="shift.id" class="shift-row">
-            <span class="shift-dates">{{ shift.startDate }} — {{ shift.endDate ?? 'по настоящее время' }}</span>
+            <span class="shift-dates"
+              >{{ shift.startDate }} — {{ shift.endDate ?? 'по настоящее время' }}</span
+            >
             <span class="badge" :class="shift.isOfficial ? 'badge-outline' : 'badge-solid'">
               {{ shift.isOfficial ? 'белая' : 'чёрная' }}
             </span>
             <span class="shift-actions">
-              <button type="button" class="btn-link" @click="openShiftModal(shift)">
+              <button
+                type="button"
+                class="btn-link"
+                :disabled="actionsDisabled"
+                @click="openShiftModal(shift)"
+              >
                 {{ shift.endDate ? 'изменить' : 'закрыть вахту' }}
               </button>
-              <button type="button" class="btn-link danger" @click="handleDeleteShift(shift)">удалить</button>
+              <LoadingButton
+                class="btn-link danger"
+                :disabled="actionsDisabled"
+                :loading="activeAction === `delete-shift:${shift.id}`"
+                loading-text="Удаляем…"
+                @click="handleDeleteShift(shift)"
+                >удалить</LoadingButton
+              >
             </span>
           </li>
         </ul>
@@ -193,12 +282,25 @@ function toggleExpand(period: string) {
 
       <section v-else class="payroll">
         <div class="payroll-actions">
-          <button type="button" class="btn-primary" @click="openAccrualModal()">Начисление за месяц</button>
-          <button type="button" class="btn-secondary" @click="openPaymentModal()">Добавить выплату</button>
+          <button
+            type="button"
+            class="btn-primary"
+            :disabled="actionsDisabled"
+            @click="openAccrualModal()"
+          >
+            Начисление за месяц
+          </button>
+          <button
+            type="button"
+            class="btn-secondary"
+            :disabled="actionsDisabled"
+            @click="openPaymentModal()"
+          >
+            Добавить выплату
+          </button>
         </div>
 
-        <p v-if="loading" class="empty-state">Загрузка…</p>
-        <p v-else-if="periods.length === 0" class="empty-state">Пока нет начислений и выплат.</p>
+        <p v-if="periods.length === 0" class="empty-state">Пока нет начислений и выплат.</p>
 
         <div v-else class="period-list">
           <div v-for="p in periods" :key="p.period" class="period-card">
@@ -208,18 +310,36 @@ function toggleExpand(period: string) {
               <span class="period-sums">
                 <span>начислено: {{ formatMoney(p.accruedWhiteMinor + p.accruedBlackMinor) }}</span>
                 <span>выплачено: {{ formatMoney(p.paidWhiteMinor + p.paidBlackMinor) }}</span>
-                <span
-                  class="due"
-                  :class="{ overpaid: p.dueWhiteMinor + p.dueBlackMinor < 0 }"
-                >
+                <span class="due" :class="{ overpaid: p.dueWhiteMinor + p.dueBlackMinor < 0 }">
                   остаток: {{ formatMoney(p.dueWhiteMinor + p.dueBlackMinor) }}
                 </span>
               </span>
 
               <div class="period-actions" @click.stop>
-                <button type="button" class="btn-link" @click="openAccrualModal(p)">изменить начисление</button>
-                <button type="button" class="btn-link" @click="openPaymentModal(p.period)">+ выплата</button>
-                <button type="button" class="btn-link danger" @click="handleDeleteAccrual(p)">удалить начисление</button>
+                <button
+                  type="button"
+                  class="btn-link"
+                  :disabled="actionsDisabled"
+                  @click="openAccrualModal(p)"
+                >
+                  изменить начисление
+                </button>
+                <button
+                  type="button"
+                  class="btn-link"
+                  :disabled="actionsDisabled"
+                  @click="openPaymentModal(p.period)"
+                >
+                  + выплата
+                </button>
+                <LoadingButton
+                  class="btn-link danger"
+                  :disabled="actionsDisabled"
+                  :loading="activeAction === `delete-accrual:${p.period}`"
+                  loading-text="Удаляем…"
+                  @click="handleDeleteAccrual(p)"
+                  >удалить начисление</LoadingButton
+                >
               </div>
             </div>
 
@@ -238,15 +358,34 @@ function toggleExpand(period: string) {
               <p v-if="p.payments.length === 0" class="empty-state">Выплат ещё не было.</p>
               <ul v-else class="payment-rows">
                 <li v-for="payment in p.payments" :key="payment.id" class="payment-row">
-                  <span class="badge" :class="payment.channel === 'WHITE' ? 'badge-outline' : 'badge-solid'">
+                  <span
+                    class="badge"
+                    :class="payment.channel === 'WHITE' ? 'badge-outline' : 'badge-solid'"
+                  >
                     {{ payment.channel === 'WHITE' ? 'белая' : 'чёрная' }}
                   </span>
-                  <span class="payment-type">{{ payment.type === 'ADVANCE' ? 'аванс' : 'зарплата' }}</span>
+                  <span class="payment-type">{{
+                    payment.type === 'ADVANCE' ? 'аванс' : 'зарплата'
+                  }}</span>
                   <span class="payment-amount">{{ formatMoney(payment.amountMinor) }}</span>
                   <span class="payment-date">{{ payment.paidAt }}</span>
                   <span class="payment-actions">
-                    <button type="button" class="btn-link" @click="openEditPayment(payment)">изменить</button>
-                    <button type="button" class="btn-link danger" @click="handleDeletePayment(payment)">удалить</button>
+                    <button
+                      type="button"
+                      class="btn-link"
+                      :disabled="actionsDisabled"
+                      @click="openEditPayment(payment)"
+                    >
+                      изменить
+                    </button>
+                    <LoadingButton
+                      class="btn-link danger"
+                      :disabled="actionsDisabled"
+                      :loading="activeAction === `delete-payment:${payment.id}`"
+                      loading-text="Удаляем…"
+                      @click="handleDeletePayment(payment)"
+                      >удалить</LoadingButton
+                    >
                   </span>
                 </li>
               </ul>
@@ -259,7 +398,9 @@ function toggleExpand(period: string) {
     <AccrualFormModal
       :open="accrualModalOpen"
       :initial="accrualModalInitial"
-      @close="accrualModalOpen = false"
+      :saving="pending"
+      :error="error"
+      @close="!pending && (accrualModalOpen = false)"
       @save="handleAccrualSave"
     />
 
@@ -267,14 +408,18 @@ function toggleExpand(period: string) {
       :open="paymentModalOpen"
       :payment="editingPayment"
       :default-period="paymentDefaultPeriod"
-      @close="paymentModalOpen = false"
+      :saving="pending"
+      :error="error"
+      @close="!pending && (paymentModalOpen = false)"
       @save="handlePaymentSave"
     />
 
     <ShiftFormModal
       :open="shiftModalOpen"
       :shift="editingShift"
-      @close="shiftModalOpen = false"
+      :saving="pending"
+      :error="error"
+      @close="!pending && (shiftModalOpen = false)"
       @save="handleShiftSave"
     />
   </div>

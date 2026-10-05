@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import LoadingButton from '../components/LoadingButton.vue'
+import { useAsyncAction } from '../composables/useAsyncAction'
 
 const auth = useAuthStore()
 const router = useRouter()
+const { pending: loggingOut, error, run } = useAsyncAction()
 
 async function handleLogout() {
-  await auth.logout()
-  router.push({ name: 'login' })
+  await run('logout', async () => {
+    await auth.logout()
+    await router.push({ name: 'login' })
+  })
 }
 </script>
 
@@ -24,12 +29,19 @@ async function handleLogout() {
 
       <div class="user-block">
         <div class="user-name">{{ auth.user?.fullName }}</div>
-        <button class="logout-btn" @click="handleLogout">Выйти</button>
+        <LoadingButton
+          class="logout-btn"
+          :loading="loggingOut"
+          loading-text="Выходим…"
+          @click="handleLogout"
+          >Выйти</LoadingButton
+        >
+        <p v-if="error" class="error-message" role="alert">{{ error }}</p>
       </div>
     </aside>
 
     <main class="content">
-      <RouterView />
+      <RouterView :key="$route.fullPath" />
     </main>
   </div>
 </template>

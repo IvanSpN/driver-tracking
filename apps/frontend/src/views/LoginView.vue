@@ -2,28 +2,21 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import LoadingButton from '../components/LoadingButton.vue'
+import { useAsyncAction } from '../composables/useAsyncAction'
 
 const auth = useAuthStore()
 const router = useRouter()
 
 const email = ref('')
 const password = ref('')
-const error = ref('')
-const loading = ref(false)
+const { pending: loading, error, run } = useAsyncAction()
 
 async function submit() {
-  error.value = ''
-  loading.value = true
-
-  try {
+  await run('login', async () => {
     await auth.login(email.value, password.value)
-    router.push({ name: 'dashboard' })
-  } catch (e) {
-    const message = (e as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message
-    error.value = (Array.isArray(message) ? message[0] : message) ?? 'Не удалось выполнить запрос'
-  } finally {
-    loading.value = false
-  }
+    await router.push({ name: 'dashboard' })
+  })
 }
 </script>
 
@@ -32,26 +25,30 @@ async function submit() {
     <div class="auth-card">
       <h1 class="title">Вход</h1>
 
-      <form class="form" @submit.prevent="submit">
-        <label class="field">
-          <span>Email</span>
-          <input v-model="email" type="email" required autocomplete="email" />
-        </label>
+      <form class="form" :aria-busy="loading" @submit.prevent="submit">
+        <fieldset class="form form-fields" :disabled="loading">
+          <label class="field">
+            <span>Email</span>
+            <input v-model="email" type="email" required autocomplete="email" />
+          </label>
 
-        <label class="field">
-          <span>Пароль</span>
-          <input
-            v-model="password"
-            type="password"
-            required
-            minlength="6"
-            autocomplete="current-password"
-          />
-        </label>
+          <label class="field">
+            <span>Пароль</span>
+            <input
+              v-model="password"
+              type="password"
+              required
+              minlength="6"
+              autocomplete="current-password"
+            />
+          </label>
 
-        <p v-if="error" class="error">{{ error }}</p>
+          <p v-if="error" class="error" role="alert">{{ error }}</p>
 
-        <button type="submit" class="submit-btn" :disabled="loading">Войти</button>
+          <LoadingButton type="submit" class="submit-btn" :loading="loading" loading-text="Входим…"
+            >Войти</LoadingButton
+          >
+        </fieldset>
       </form>
     </div>
   </div>

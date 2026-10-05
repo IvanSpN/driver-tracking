@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import { reactive, watch } from 'vue'
 import BaseModal from './BaseModal.vue'
+import LoadingButton from './LoadingButton.vue'
 import type { Payment, PayChannel, PaymentType, PaymentMethod, PaymentInput } from '../api/payroll'
 
-const props = defineProps<{ open: boolean; payment?: Payment | null; defaultPeriod: string }>()
+const props = defineProps<{
+  open: boolean
+  payment?: Payment | null
+  defaultPeriod: string
+  saving?: boolean
+  error?: string
+}>()
 const emit = defineEmits<{
   close: []
   save: [value: PaymentInput]
@@ -49,6 +56,7 @@ watch(
 )
 
 function submit() {
+  if (props.saving) return
   emit('save', {
     period: form.period,
     channel: form.channel,
@@ -62,58 +70,72 @@ function submit() {
 </script>
 
 <template>
-  <BaseModal :open="open" :title="payment ? 'Изменить выплату' : 'Новая выплата'" @close="emit('close')">
+  <BaseModal
+    :open="open"
+    :title="payment ? 'Изменить выплату' : 'Новая выплата'"
+    :busy="saving"
+    :error="error"
+    @close="emit('close')"
+  >
     <form class="form" @submit.prevent="submit">
-      <label class="field">
-        <span>Месяц</span>
-        <input v-model="form.period" type="month" required />
-      </label>
+      <fieldset class="form form-fields" :disabled="saving">
+        <label class="field">
+          <span>Месяц</span>
+          <input v-model="form.period" type="month" required />
+        </label>
 
-      <label class="field">
-        <span>Канал</span>
-        <select v-model="form.channel">
-          <option value="WHITE">Белая</option>
-          <option value="BLACK">Чёрная</option>
-        </select>
-      </label>
+        <label class="field">
+          <span>Канал</span>
+          <select v-model="form.channel">
+            <option value="WHITE">Белая</option>
+            <option value="BLACK">Чёрная</option>
+          </select>
+        </label>
 
-      <label class="field">
-        <span>Тип</span>
-        <select v-model="form.type">
-          <option value="ADVANCE">Аванс</option>
-          <option value="SALARY">Зарплата</option>
-        </select>
-      </label>
+        <label class="field">
+          <span>Тип</span>
+          <select v-model="form.type">
+            <option value="ADVANCE">Аванс</option>
+            <option value="SALARY">Зарплата</option>
+          </select>
+        </label>
 
-      <label class="field">
-        <span>Сумма, ₽</span>
-        <input v-model.number="form.amountRub" type="number" min="1" step="1" required />
-      </label>
+        <label class="field">
+          <span>Сумма, ₽</span>
+          <input v-model.number="form.amountRub" type="number" min="1" step="1" required />
+        </label>
 
-      <label class="field">
-        <span>Дата выплаты</span>
-        <input v-model="form.paidAt" type="date" required />
-      </label>
+        <label class="field">
+          <span>Дата выплаты</span>
+          <input v-model="form.paidAt" type="date" required />
+        </label>
 
-      <label class="field">
-        <span>Способ</span>
-        <select v-model="form.method">
-          <option value="CASH">Наличные</option>
-          <option value="BANK">Банк</option>
-          <option value="CARD">Карта</option>
-          <option value="OTHER">Другое</option>
-        </select>
-      </label>
+        <label class="field">
+          <span>Способ</span>
+          <select v-model="form.method">
+            <option value="CASH">Наличные</option>
+            <option value="BANK">Банк</option>
+            <option value="CARD">Карта</option>
+            <option value="OTHER">Другое</option>
+          </select>
+        </label>
 
-      <label class="field">
-        <span>Заметка</span>
-        <input v-model="form.note" type="text" />
-      </label>
+        <label class="field">
+          <span>Заметка</span>
+          <input v-model="form.note" type="text" />
+        </label>
 
-      <div class="actions">
-        <button type="button" class="btn-secondary" @click="emit('close')">Отмена</button>
-        <button type="submit" class="btn-primary">Сохранить</button>
-      </div>
+        <div class="actions">
+          <button type="button" class="btn-secondary" @click="emit('close')">Отмена</button>
+          <LoadingButton
+            type="submit"
+            class="btn-primary"
+            :loading="saving"
+            loading-text="Сохраняем…"
+            >Сохранить</LoadingButton
+          >
+        </div>
+      </fieldset>
     </form>
   </BaseModal>
 </template>

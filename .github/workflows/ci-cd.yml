@@ -60,9 +60,38 @@ jobs:
       - name: Тесты
         run: npm test --workspace=apps/backend
 
+  frontend:
+    name: Frontend — тесты
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Зависимости
+        run: npm ci --workspace=apps/frontend
+
+      # Тесты поднимают vite, а linux-бинарников rolldown и lightningcss в lock-файле нет —
+      # то же, что в apps/frontend/Dockerfile
+      - name: Нативные модули для vite
+        run: |
+          RD=$(node -p "require('./apps/frontend/node_modules/rolldown/package.json').version")
+          LC=$(node -p "require('./apps/frontend/node_modules/lightningcss/package.json').version")
+          npm install --no-save --workspace=apps/frontend \
+            "@rolldown/binding-linux-x64-gnu@$RD" "lightningcss-linux-x64-gnu@$LC"
+
+      - name: Тесты
+        run: npm test --workspace=apps/frontend
+
   deploy:
     name: Деплой на сервер
-    needs: [build, backend]
+    needs: [build, backend, frontend]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30

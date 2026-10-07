@@ -1,19 +1,8 @@
 <script setup lang="ts">
-import { RouterLink, RouterView, useRouter } from 'vue-router'
+import { RouterLink, RouterView } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import LoadingButton from '../components/LoadingButton.vue'
-import { useAsyncAction } from '../composables/useAsyncAction'
 
 const auth = useAuthStore()
-const router = useRouter()
-const { pending: loggingOut, error, run } = useAsyncAction()
-
-async function handleLogout() {
-  await run('logout', async () => {
-    await auth.logout()
-    await router.push({ name: 'login' })
-  })
-}
 </script>
 
 <template>
@@ -32,15 +21,7 @@ async function handleLogout() {
 
       <div class="user-block">
         <div class="user-name">{{ auth.user?.fullName }}</div>
-        <LoadingButton
-          class="btn-secondary logout-btn"
-          :loading="loggingOut"
-          loading-text="Выходим…"
-          @click="handleLogout"
-          >Выйти</LoadingButton
-        >
       </div>
-      <p v-if="error" class="error-message logout-error" role="alert">{{ error }}</p>
     </aside>
 
     <main class="content">
@@ -73,9 +54,8 @@ async function handleLogout() {
 .sidebar {
   flex-shrink: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  gap: 16px 12px;
   padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 16px
     max(16px, env(safe-area-inset-left));
   background: var(--surface);
@@ -83,8 +63,8 @@ async function handleLogout() {
 }
 
 .nav {
-  grid-column: 1 / -1;
-  grid-row: 2;
+  grid-column: 1;
+  grid-row: 1;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
@@ -114,27 +94,7 @@ async function handleLogout() {
 }
 
 .user-block {
-  grid-column: 2;
-  grid-row: 1;
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.user-name {
   display: none;
-  color: var(--text-muted);
-  font-size: 16px;
-}
-
-.logout-btn {
-  padding-inline: 12px;
-}
-
-.logout-error {
-  grid-column: 1 / -1;
-  margin: 0;
 }
 
 .content {
@@ -166,7 +126,6 @@ async function handleLogout() {
 @media (max-height: 500px) and (max-width: 959px) {
   .shell-drivers .sidebar {
     padding-block: max(8px, env(safe-area-inset-top)) 8px;
-    gap: 8px;
     max-height: 35%;
     overflow-y: auto;
   }
@@ -212,12 +171,11 @@ async function handleLogout() {
   }
 
   .user-block {
-    border-top: 1px solid var(--border);
-    padding-top: 20px;
-  }
-
-  .user-name {
     display: block;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 16px;
   }
 
   .content {

@@ -404,8 +404,25 @@ test('viewport locking applies only to the drivers list, not the detail or other
     const html = await renderToString(createSSRApp(layout).use(createPinia()).use(router))
     assert.equal(html.includes('shell-drivers'), path === '/drivers')
     assert.match(html, /Основная навигация/)
-    assert.match(html, /Выйти/)
+    assert.doesNotMatch(html, /Выйти/)
   }
+})
+
+test('logout is available from settings instead of the shared navigation', async () => {
+  const { default: component } = await server.ssrLoadModule('/src/views/SettingsView.vue')
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/login', name: 'login', component: { render: () => h('div') } },
+      { path: '/settings', name: 'settings', component },
+    ],
+  })
+  await router.push('/settings')
+
+  const html = await renderToString(createSSRApp(component).use(createPinia()).use(router))
+  assert.match(html, /Аккаунт/)
+  assert.match(html, /Выйти/)
+  assert.match(html, /class="[^"]*logout-btn[^"]*"/)
 })
 
 test('only dismissed drivers offer permanent deletion', async () => {

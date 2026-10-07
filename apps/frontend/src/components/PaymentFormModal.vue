@@ -8,6 +8,7 @@ const props = defineProps<{
   open: boolean
   payment?: Payment | null
   defaultPeriod: string
+  defaultType?: PaymentType
   saving?: boolean
   error?: string
 }>()
@@ -31,8 +32,8 @@ function todayIso() {
 }
 
 watch(
-  () => [props.open, props.payment, props.defaultPeriod] as const,
-  ([open, payment, defaultPeriod]) => {
+  () => [props.open, props.payment, props.defaultPeriod, props.defaultType] as const,
+  ([open, payment, defaultPeriod, defaultType]) => {
     if (!open) return
     if (payment) {
       form.period = payment.period
@@ -45,7 +46,8 @@ watch(
     } else {
       form.period = defaultPeriod
       form.channel = 'WHITE'
-      form.type = 'ADVANCE'
+      // Первая выплата месяца — аванс; если аванс уже был — по умолчанию зарплата.
+      form.type = defaultType ?? 'ADVANCE'
       form.amountRub = 0
       form.paidAt = todayIso()
       form.method = 'CASH'

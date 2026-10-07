@@ -167,8 +167,10 @@ test('older filter responses cannot replace newer data or clear its loading stat
   assert.equal(store.loading, false)
   assert.equal(store.drivers[0].id, 'new')
 
-  const third = store.fetchList()
-  const fourth = store.fetchList()
+  // Форсируем обход TTL-кэша: проверяем гонку запросов под тем же фильтром,
+  // как это бывает при обновлении после правок.
+  const third = store.fetchList(true)
+  const fourth = store.fetchList(true)
   await tick()
   requests[3].resolve([{ id: 'latest' }])
   await fourth
@@ -176,6 +178,40 @@ test('older filter responses cannot replace newer data or clear its loading stat
   await third
   assert.equal(store.drivers[0].id, 'latest')
   assert.equal(store.error, '')
+})
+
+test('the driver list is served from cache within its TTL and refetched after changes', async () => {
+  const requests = controlledRequests()
+  const store = useDriversStore()
+
+  const first = store.fetchList()
+  await tick()
+  assert.equal(requests.length, 1)
+  requests[0].resolve([{ id: 'a' }])
+  await first
+
+  // Повторный вход под тем же фильтром в пределах TTL — сеть не трогаем.
+  await store.fetchList()
+  assert.equal(requests.length, 1)
+
+  // Смена фильтра — другой набор данных, запрос обязателен.
+  store.officialFilter = 'official'
+  const second = store.fetchList()
+  await tick()
+  assert.equal(requests.length, 2)
+  requests[1].resolve([{ id: 'b' }])
+  await second
+
+  // Любая правка сбрасывает кэш: следующий список снова идёт в сеть.
+  const removal = store.remove('a')
+  await tick()
+  requests[2].resolve({})
+  await removal
+  const refresh = store.fetchList()
+  await tick()
+  assert.equal(requests.length, 4)
+  requests[3].resolve([{ id: 'b' }])
+  await refresh
 })
 
 test('failed reload preserves data and does not turn a completed save into a failed save', async () => {
@@ -382,7 +418,8 @@ test('drivers list has its own accessible scroll area, including loading, empty 
     assert.ok(html.indexOf('class="drivers-toolbar"') < scrollArea.index)
     assert.doesNotMatch(html, /<h1[^>]*>Водители<\/h1>/)
     assert.match(html, /aria-label="Добавить водителя"/)
-    assert.match(html, /class="[^"]*filter-actions[^"]*"/)
+    // Кнопка добавления живёт в тулбаре, а не в прокручиваемом списке.
+    assert.ok(html.indexOf('aria-label="Добавить водителя"') < scrollArea.index)
     if (state === 'loaded') assert.match(scrollArea[1], /Тестовый/)
     if (state === 'loading') assert.match(scrollArea[1], /Загружаем водителей/)
     if (state === 'empty') assert.match(scrollArea[1], /Пока нет водителей/)

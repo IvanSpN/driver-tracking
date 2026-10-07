@@ -3,8 +3,10 @@ import { useRouter } from 'vue-router'
 import LoadingButton from '../components/LoadingButton.vue'
 import { useAsyncAction } from '../composables/useAsyncAction'
 import { useAuthStore } from '../stores/auth'
+import { useDriversStore } from '../stores/drivers'
 
 const auth = useAuthStore()
+const drivers = useDriversStore()
 const router = useRouter()
 const { pending: loggingOut, error, run } = useAsyncAction()
 
@@ -21,7 +23,19 @@ async function handleLogout() {
     <h1>Настройки</h1>
     <p class="empty-state">Тема и смена пароля появятся здесь позже.</p>
 
-    <section class="account" aria-labelledby="account-heading">
+    <section class="card prefs" aria-labelledby="drivers-heading">
+      <h2 id="drivers-heading">Водители</h2>
+      <label class="checkbox-field">
+        <input v-model="drivers.showArchived" type="checkbox" />
+        <span>Показывать уволенных в списке</span>
+      </label>
+      <p class="pref-hint">
+        Уволенные появятся в общем списке водителей — с действиями «Восстановить» и «Удалить
+        навсегда».
+      </p>
+    </section>
+
+    <section class="card account" aria-labelledby="account-heading">
       <h2 id="account-heading">Аккаунт</h2>
       <p v-if="auth.user" class="account-details">
         Вы вошли как <strong>{{ auth.user.fullName }}</strong>
@@ -40,18 +54,24 @@ async function handleLogout() {
 </template>
 
 <style scoped>
-.account {
-  margin-top: 24px;
+.card {
+  margin-top: 16px;
   padding: 20px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
 
-.account h2 {
+.card h2 {
   margin: 0 0 12px;
   font-size: 20px;
   line-height: 1.3;
+}
+
+.pref-hint {
+  margin: 10px 0 0;
+  color: var(--text-muted);
+  font-size: 15px;
 }
 
 .account-details {

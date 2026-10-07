@@ -3,8 +3,19 @@ import { onBeforeUnmount, ref, useId, watch } from 'vue'
 import LoadingSpinner from './LoadingSpinner.vue'
 import { menuPosition } from '../utils/menuPosition'
 
-const props = defineProps<{ driverName: string; disabled?: boolean; loading?: boolean }>()
-const emit = defineEmits<{ edit: []; dismiss: [] }>()
+export interface ActionMenuItem {
+  key: string
+  label: string
+  danger?: boolean
+}
+
+const props = defineProps<{
+  label: string
+  items: ActionMenuItem[]
+  disabled?: boolean
+  loading?: boolean
+}>()
+const emit = defineEmits<{ select: [key: string] }>()
 const menuId = useId()
 const trigger = ref<HTMLButtonElement | null>(null)
 const dialog = ref<HTMLDialogElement | null>(null)
@@ -58,11 +69,10 @@ function openMenu() {
   }
 }
 
-function choose(action: 'edit' | 'dismiss') {
+function choose(key: string) {
   if (!opened.value || props.disabled || props.loading) return
   closeMenu()
-  if (action === 'edit') emit('edit')
-  else emit('dismiss')
+  emit('select', key)
 }
 
 watch(
@@ -75,12 +85,12 @@ onBeforeUnmount(closeMenu)
 </script>
 
 <template>
-  <div class="driver-menu" @click.stop>
+  <div class="actions-menu" @click.stop>
     <button
       ref="trigger"
       type="button"
       class="btn-secondary menu-trigger"
-      :aria-label="`Действия: ${driverName}`"
+      :aria-label="label"
       aria-haspopup="dialog"
       :aria-expanded="opened"
       :aria-controls="menuId"
@@ -95,56 +105,35 @@ onBeforeUnmount(closeMenu)
       :id="menuId"
       ref="dialog"
       class="menu-popup"
-      :aria-label="`Действия: ${driverName}`"
+      :aria-label="label"
       @cancel.prevent="closeMenu"
       @close="closeMenu"
       @click.self="closeMenu"
     >
-      <button
-        type="button"
-        class="menu-item"
-        :disabled="disabled || loading"
-        @click="choose('edit')"
-      >
-        Редактировать
-      </button>
-      <div class="menu-divider" role="separator" />
-      <button
-        type="button"
-        class="menu-item menu-item-danger"
-        :disabled="disabled || loading"
-        @click="choose('dismiss')"
-      >
-        Уволить
-      </button>
+      <template v-for="(item, index) in items" :key="item.key">
+        <div v-if="index > 0" class="menu-divider" role="separator" />
+        <button
+          type="button"
+          class="menu-item"
+          :class="{ 'menu-item-danger': item.danger }"
+          :disabled="disabled || loading"
+          @click="choose(item.key)"
+        >
+          {{ item.label }}
+        </button>
+      </template>
     </dialog>
   </div>
 </template>
 
 <style scoped>
-/* Visually a light glyph, but the tap target stays a full 44x44. */
 .menu-trigger {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  min-height: 44px;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
   padding: 0;
-  border-color: transparent;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 22px;
+  font-size: 28px;
   line-height: 1;
-}
-
-.menu-trigger:active:not(:disabled) {
-  background: var(--surface-hover);
-  box-shadow: none;
-}
-
-@media (hover: hover) {
-  .menu-trigger:hover:not(:disabled) {
-    background: var(--surface-hover);
-  }
 }
 
 .menu-popup {

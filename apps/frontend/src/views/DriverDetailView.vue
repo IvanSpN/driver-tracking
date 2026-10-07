@@ -4,13 +4,15 @@ import { useRoute } from 'vue-router'
 import * as driversApi from '../api/drivers'
 import type { Driver } from '../api/drivers'
 import * as payrollApi from '../api/payroll'
-import type { AccrualInput, PayrollPeriod, Payment, PaymentInput } from '../api/payroll'
+import type { AccrualInput, PayrollPeriod, Payment, PaymentInput, PaymentType } from '../api/payroll'
 import * as shiftsApi from '../api/shifts'
 import type { Shift, ShiftInput } from '../api/shifts'
 import AccrualFormModal from '../components/AccrualFormModal.vue'
 import type { AccrualFormValue } from '../components/AccrualFormModal.vue'
 import PaymentFormModal from '../components/PaymentFormModal.vue'
 import ShiftFormModal from '../components/ShiftFormModal.vue'
+import ActionsMenu from '../components/ActionsMenu.vue'
+import type { ActionMenuItem } from '../components/ActionsMenu.vue'
 import LoadingButton from '../components/LoadingButton.vue'
 import LoadingState from '../components/LoadingState.vue'
 import { useAsyncAction } from '../composables/useAsyncAction'
@@ -39,6 +41,7 @@ const accrualModalInitial = ref<AccrualFormValue | null>(null)
 const paymentModalOpen = ref(false)
 const editingPayment = ref<Payment | null>(null)
 const paymentDefaultPeriod = ref('')
+const paymentDefaultType = ref<PaymentType>('ADVANCE')
 
 const shiftModalOpen = ref(false)
 const editingShift = ref<Shift | null>(null)
@@ -148,7 +151,11 @@ function openPaymentModal(period?: string) {
   if (actionsDisabled.value) return
   error.value = ''
   editingPayment.value = null
-  paymentDefaultPeriod.value = period ?? currentPeriod()
+  const target = period ?? currentPeriod()
+  paymentDefaultPeriod.value = target
+  const found = periods.value.find((p) => p.period === target)
+  const hasAdvance = !!found?.payments.some((payment) => payment.type === 'ADVANCE')
+  paymentDefaultType.value = hasAdvance ? 'SALARY' : 'ADVANCE'
   paymentModalOpen.value = true
 }
 
@@ -183,6 +190,74 @@ async function handleDeletePayment(payment: Payment) {
 
 function toggleExpand(period: string) {
   expandedPeriod.value = expandedPeriod.value === period ? null : period
+}
+
+// "2026-09-15" -> "15.09.2026"
+function formatDate(date: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
+  return match ? `${match[3]}.${match[2]}.${match[1]}` : date
+}
+
+const MONTHS_GENITIVE = [
+  'января',
+  'февраля',
+  'марта',
+  'апреля',
+  'мая',
+  'июня',
+  'июля',
+  'августа',
+  'сентября',
+  'октября',
+  'ноября',
+  'декабря',
+] as const
+
+// "2026-09-15" -> "15 сентября 2026"
+function formatDateLong(date: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
+  if (!match) return date
+  const month = MONTHS_GENITIVE[Number(match[2]) - 1]
+  if (!month) return date
+  return `${Number(match[3])} ${month} ${match[1]}`
+}
+
+function handleShiftAction(shift: Shift, key: string) {
+  if (key === 'edit-shift') openShiftModal(shift)
+  else if (key === 'clear-end') void handleClearShiftEnd(shift)
+  else if (key === 'delete-shift') void handleDeleteShift(shift)
+}
+
+function shiftMenuItems(shift: Shift): ActionMenuItem[] {
+  const items: ActionMenuItem[] = [{ key: 'edit-shift', label: 'Изменить даты / вахту' }]
+  if (shift.endDate) items.push({ key: 'clear-end', label: 'Убрать дату окончания' })
+  items.push({ key: 'delete-shift', label: 'Удалить', danger: true })
+  return items
+}
+
+function shiftMenuBusy(shift: Shift): boolean {
+  return (
+    activeAction.value === `delete-shift:${shift.id}` ||
+    activeAction.value === `clear-shift-end:${shift.id}`
+  )
+}
+
+async function handleClearShiftEnd(shift: Shift) {
+  if (actionsDisabled.value || !shift.endDate) return
+  if (!confirm('Убрать дату окончания вахты?\n\nВахта станет открытой — без даты окончания.')) return
+  await run(`clear-shift-end:${shift.id}`, async () => {
+    await shiftsApi.updateShift(shift.id, { endDate: null })
+    await load()
+  })
+}
+
+function paymentType(payment: Payment): string {
+  return payment.type === 'ADVANCE' ? 'аванс' : 'зарплата'
+}
+
+function handlePeriodAction(p: PayrollPeriod, key: string) {
+  if (key === 'edit-accrual') openAccrualModal(p)
+  else if (key === 'delete-accrual') void handleDeleteAccrual(p)
 }
 </script>
 
@@ -290,30 +365,21 @@ function toggleExpand(period: string) {
 
           <ul v-else class="shift-list">
             <li v-for="shift in shifts" :key="shift.id" class="shift-row">
-              <span class="shift-dates"
-                >{{ shift.startDate }} — {{ shift.endDate ?? 'по настоящее время' }}</span
-              >
-              <span class="badge" :class="shift.isOfficial ? 'badge-outline' : 'badge-solid'">
-                {{ shift.isOfficial ? 'белая' : 'чёрная' }}
-              </span>
-              <span class="shift-actions">
-                <button
-                  type="button"
-                  class="btn-secondary"
-                  :disabled="actionsDisabled"
-                  @click="openShiftModal(shift)"
-                >
-                  Изменить даты / вахту
-                </button>
-                <LoadingButton
-                  class="btn-secondary danger"
-                  :disabled="actionsDisabled"
-                  :loading="activeAction === `delete-shift:${shift.id}`"
-                  loading-text="Удаляем…"
-                  @click="handleDeleteShift(shift)"
-                  >Удалить</LoadingButton
-                >
-              </span>
+              <div class="shift-main">
+                <span class="shift-dates">
+                  с {{ formatDateLong(shift.startDate)
+                  }}<template v-if="shift.endDate"> по {{ formatDateLong(shift.endDate) }}</template>
+                </span>
+                <span v-if="!shift.endDate" class="shift-open">дата окончания вахты не задана</span>
+              </div>
+              <ActionsMenu
+                class="shift-menu"
+                :label="`Вахта с ${formatDateLong(shift.startDate)}`"
+                :disabled="actionsDisabled"
+                :loading="shiftMenuBusy(shift)"
+                :items="shiftMenuItems(shift)"
+                @select="(key) => handleShiftAction(shift, key)"
+              />
             </li>
           </ul>
         </section>
@@ -327,14 +393,6 @@ function toggleExpand(period: string) {
               @click="openAccrualModal()"
             >
               Начисление за месяц
-            </button>
-            <button
-              type="button"
-              class="btn-secondary"
-              :disabled="actionsDisabled"
-              @click="openPaymentModal()"
-            >
-              Добавить выплату
             </button>
           </div>
 
@@ -350,9 +408,23 @@ function toggleExpand(period: string) {
                     <dt>Начислено</dt>
                     <dd>{{ formatMoney(p.accruedWhiteMinor + p.accruedBlackMinor) }}</dd>
                   </div>
-                  <div>
+                  <div class="paid">
                     <dt>Выплачено</dt>
                     <dd>{{ formatMoney(p.paidWhiteMinor + p.paidBlackMinor) }}</dd>
+                    <ul v-if="p.payments.length" class="paid-breakdown">
+                      <li v-for="payment in p.payments" :key="payment.id" class="paid-item">
+                        <span class="paid-what">
+                          <span
+                            class="badge paid-tag"
+                            :class="payment.channel === 'WHITE' ? 'badge-outline' : 'badge-solid'"
+                          >
+                            {{ payment.channel === 'WHITE' ? 'белая' : 'чёрная' }}
+                          </span>
+                          {{ paymentType(payment) }} · {{ formatDate(payment.paidAt) }}
+                        </span>
+                        <span class="paid-sum">{{ formatMoney(payment.amountMinor) }}</span>
+                      </li>
+                    </ul>
                   </div>
                   <div class="due" :class="{ overpaid: p.dueWhiteMinor + p.dueBlackMinor < 0 }">
                     <dt>Остаток</dt>
@@ -363,28 +435,23 @@ function toggleExpand(period: string) {
                 <div class="period-actions">
                   <button
                     type="button"
-                    class="btn-secondary"
-                    :disabled="actionsDisabled"
-                    @click="openAccrualModal(p)"
-                  >
-                    Изменить начисление
-                  </button>
-                  <button
-                    type="button"
-                    class="btn-secondary"
+                    class="btn-secondary add-payment"
                     :disabled="actionsDisabled"
                     @click="openPaymentModal(p.period)"
                   >
                     Добавить выплату
                   </button>
-                  <LoadingButton
-                    class="btn-secondary danger"
+                  <ActionsMenu
+                    class="period-menu"
+                    :label="`Начисление за ${formatPeriod(p.period)}`"
                     :disabled="actionsDisabled"
                     :loading="activeAction === `delete-accrual:${p.period}`"
-                    loading-text="Удаляем…"
-                    @click="handleDeleteAccrual(p)"
-                    >Удалить начисление</LoadingButton
-                  >
+                    :items="[
+                      { key: 'edit-accrual', label: 'Изменить начисление' },
+                      { key: 'delete-accrual', label: 'Удалить начисление', danger: true },
+                    ]"
+                    @select="(key) => handlePeriodAction(p, key)"
+                  />
                 </div>
               </div>
 
@@ -462,6 +529,7 @@ function toggleExpand(period: string) {
       :open="paymentModalOpen"
       :payment="editingPayment"
       :default-period="paymentDefaultPeriod"
+      :default-type="paymentDefaultType"
       :saving="pending"
       :error="error"
       @close="!pending && (paymentModalOpen = false)"
@@ -501,7 +569,7 @@ function toggleExpand(period: string) {
 }
 
 .tabs {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .tab-content {
@@ -558,7 +626,7 @@ function toggleExpand(period: string) {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .shift-list,
@@ -575,32 +643,34 @@ function toggleExpand(period: string) {
   background: var(--driver-card-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 12px 12px 12px 16px;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
+}
+
+.shift-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .shift-dates {
-  flex: 1 1 220px;
   min-width: 0;
   font-size: 17px;
   font-weight: 600;
 }
 
-.shift-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  flex-basis: 100%;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+.shift-open {
+  min-width: 0;
+  font-size: 14px;
+  color: var(--text-muted);
 }
 
-.shift-actions > * {
-  flex: 1 1 180px;
-  min-width: 0;
+.shift-menu {
+  flex: 0 0 auto;
 }
 
 .period-list {
@@ -669,10 +739,64 @@ function toggleExpand(period: string) {
   color: var(--text-muted);
 }
 
-.period-actions {
+/* Read-only breakdown under "Выплачено": what was paid and when. */
+.paid-breakdown {
+  flex-basis: 100%;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+
+.paid-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.paid-what {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+  color: var(--text-muted);
+}
+
+.paid-tag {
+  align-self: center;
+  font-size: 11px;
+  padding: 1px 7px;
+}
+
+.paid-sum {
+  min-width: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.period-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
   gap: 10px;
+}
+
+.period-actions .add-payment {
+  flex: 1;
+  min-width: 0;
+}
+
+.period-menu {
+  flex: 0 0 auto;
 }
 
 .period-toggle {
@@ -765,10 +889,6 @@ function toggleExpand(period: string) {
   .period-actions {
     flex-direction: row;
     flex-wrap: wrap;
-  }
-
-  .shift-actions > * {
-    flex: 0 1 auto;
   }
 
   .period-header,

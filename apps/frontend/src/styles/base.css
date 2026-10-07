@@ -86,10 +86,10 @@ button {
 }
 
 .page h1 {
-  font-size: clamp(26px, 5vw, 32px);
+  font-size: clamp(24px, 5vw, 32px);
   line-height: 1.2;
   letter-spacing: -0.025em;
-  margin: 0 0 20px;
+  margin: 0 0 16px;
 }
 
 .empty-state {

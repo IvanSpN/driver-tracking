@@ -49,6 +49,8 @@ const auth = useAuthStore()
   display: flex;
   min-height: 0;
   overflow: hidden;
+  /* Full-height list: trim vertical gutters so more cards fit on screen. */
+  padding-block: 12px max(12px, env(safe-area-inset-bottom));
 }
 
 .sidebar {
@@ -56,7 +58,7 @@ const auth = useAuthStore()
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 16px
+  padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px
     max(16px, env(safe-area-inset-left));
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -100,7 +102,7 @@ const auth = useAuthStore()
 .content {
   min-width: 0;
   flex: 1;
-  padding: 24px max(16px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom))
+  padding: 16px max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom))
     max(16px, env(safe-area-inset-left));
 }
 

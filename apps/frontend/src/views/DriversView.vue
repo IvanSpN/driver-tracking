@@ -8,7 +8,7 @@ import LoadingButton from '../components/LoadingButton.vue'
 import LoadingState from '../components/LoadingState.vue'
 import { useAsyncAction } from '../composables/useAsyncAction'
 import type { Driver, DriverInput } from '../api/drivers'
-import { formatMoney } from '../utils/money'
+import { formatMoneyShort } from '../utils/money'
 
 const store = useDriversStore()
 const modalOpen = ref(false)
@@ -48,6 +48,18 @@ async function handleSave(input: DriverInput) {
 
 function driverName(driver: Driver) {
   return [driver.lastName, driver.firstName, driver.middleName].filter(Boolean).join(' ')
+}
+
+// "2026-10-15" -> "15.10"
+function formatDay(date: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
+  return match ? `${match[3]}.${match[2]}` : date
+}
+
+function shiftLabel(driver: Driver): string {
+  const shift = driver.currentShift
+  if (!shift) return 'не на вахте'
+  return shift.endDate ? `на вахте · до ${formatDay(shift.endDate)}` : 'на вахте'
 }
 
 async function handleRemove(driver: Driver) {
@@ -123,28 +135,16 @@ function changeFilter(filter: OfficialFilter) {
           </button>
         </div>
 
-        <div class="filter-actions">
-          <label class="checkbox-field archive-toggle">
-            <input
-              v-model="store.showArchived"
-              type="checkbox"
-              :disabled="busy"
-              @change="store.fetchList()"
-            />
-            <span>Показать уволенных</span>
-          </label>
-
-          <button
-            type="button"
-            class="btn-primary add-driver-button"
-            aria-label="Добавить водителя"
-            title="Добавить водителя"
-            :disabled="actionsDisabled"
-            @click="openCreate"
-          >
-            <span aria-hidden="true">+</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          class="btn-primary add-driver-button"
+          aria-label="Добавить водителя"
+          title="Добавить водителя"
+          :disabled="actionsDisabled"
+          @click="openCreate"
+        >
+          <span aria-hidden="true">+</span>
+        </button>
       </div>
     </div>
 
@@ -173,8 +173,36 @@ function changeFilter(filter: OfficialFilter) {
           :class="{
             'driver-row-unofficial': !driver.isOfficial,
             'driver-row-active': !driver.deletedAt,
+            'driver-row-archived': !!driver.deletedAt,
           }"
         >
+          <div class="driver-main">
+            <RouterLink
+              :to="{ name: 'driver-detail', params: { id: driver.id } }"
+              class="driver-name"
+            >
+              {{ driver.lastName }} {{ driver.firstName }} {{ driver.middleName }}
+            </RouterLink>
+
+            <div
+              v-if="driver.deletedAt || driver.currentShift || driver.totalDueMinor"
+              class="driver-meta"
+            >
+              <span v-if="driver.deletedAt" class="badge badge-dismissed driver-tag">Уволен</span>
+              <span v-else-if="driver.currentShift" class="driver-shift">
+                {{ shiftLabel(driver) }}
+              </span>
+              <span
+                v-if="driver.totalDueMinor"
+                class="driver-due"
+                :class="{ overpaid: driver.totalDueMinor < 0 }"
+              >
+                {{ driver.totalDueMinor > 0 ? 'долг' : 'переплата' }}:
+                {{ formatMoneyShort(Math.abs(driver.totalDueMinor)) }}
+              </span>
+            </div>
+          </div>
+
           <DriverActionsMenu
             v-if="!driver.deletedAt"
             class="driver-menu-position"
@@ -184,36 +212,6 @@ function changeFilter(filter: OfficialFilter) {
             @edit="openEdit(driver)"
             @dismiss="handleRemove(driver)"
           />
-          <div class="driver-info">
-            <RouterLink
-              :to="{ name: 'driver-detail', params: { id: driver.id } }"
-              class="driver-name"
-            >
-              {{ driver.lastName }} {{ driver.firstName }} {{ driver.middleName }}
-            </RouterLink>
-            <span class="badge" :class="driver.isOfficial ? 'badge-outline' : 'badge-solid'">
-              {{ driver.isOfficial ? 'белая' : 'чёрная' }}
-            </span>
-            <span v-if="driver.deletedAt" class="badge badge-dismissed">Уволен</span>
-            <a v-if="driver.phone" :href="'tel:' + driver.phone" class="driver-phone">{{
-              driver.phone
-            }}</a>
-            <span v-if="driver.currentShift" class="driver-shift">
-              на вахте{{
-                driver.currentShift.daysLeft !== null
-                  ? `, осталось ${driver.currentShift.daysLeft} дн.`
-                  : ''
-              }}
-            </span>
-            <span
-              v-if="driver.totalDueMinor"
-              class="driver-due"
-              :class="{ overpaid: driver.totalDueMinor < 0 }"
-            >
-              {{ driver.totalDueMinor > 0 ? 'долг' : 'переплата' }}:
-              {{ formatMoney(Math.abs(driver.totalDueMinor)) }}
-            </span>
-          </div>
 
           <div v-if="driver.deletedAt" class="driver-actions">
             <LoadingButton
@@ -276,22 +274,14 @@ function changeFilter(filter: OfficialFilter) {
 
 .filters {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.filter-actions {
-  display: flex;
-  min-width: 0;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 10px;
+  margin-bottom: 8px;
 }
 
-.archive-toggle {
+.filters .segmented {
+  flex: 1;
   min-width: 0;
-  color: var(--text-muted);
 }
 
 .add-driver-button {
@@ -315,19 +305,20 @@ function changeFilter(filter: OfficialFilter) {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
+/* Compact row: name + one meta line + actions menu, several fit on one screen. */
 .driver-row {
   position: relative;
   isolation: isolate;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 10px 12px;
   display: flex;
-  flex-direction: column;
-  gap: 16px;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -336,39 +327,29 @@ function changeFilter(filter: OfficialFilter) {
   --positive: var(--driver-unofficial-positive);
 
   background: var(--driver-unofficial-surface);
+  /* Тёмная полоса у левого края — признак «чёрной» (у «белой» её нет). */
+  box-shadow: inset 4px 0 0 0 var(--accent);
 }
 
-.driver-info {
-  display: flex;
+.driver-main {
+  flex: 1;
   min-width: 0;
-  align-items: center;
-  gap: 8px 10px;
-  flex-wrap: wrap;
-}
-
-.driver-menu-position {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 2;
-}
-
-.driver-row-active .driver-name {
-  min-height: 48px;
-  padding-inline-end: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .driver-name {
-  display: flex;
-  align-items: center;
-  flex-basis: 100%;
-  min-height: 44px;
+  display: block;
   min-width: 0;
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 650;
-  line-height: 1.35;
+  line-height: 1.3;
   color: var(--text);
   text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Extend the native link over the card; keep independent controls above it. */
@@ -393,45 +374,57 @@ function changeFilter(filter: OfficialFilter) {
   background: rgb(0 0 0 / 0.04);
 }
 
-.driver-phone,
-.driver-shift,
-.driver-due {
-  flex-basis: 100%;
+.driver-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
   min-width: 0;
-  font-size: 16px;
+  font-size: 14px;
 }
 
-.driver-phone {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  min-height: 44px;
-  width: fit-content;
-  color: var(--text-muted);
-  text-decoration: underline;
-  text-underline-offset: 3px;
+.driver-tag {
+  font-size: 12px;
+  padding: 2px 8px;
 }
 
 .driver-shift {
+  min-width: 0;
   color: var(--positive);
 }
 
 .driver-due {
-  font-size: 18px;
+  min-width: 0;
+  /* Push the debt to the right edge of the meta line. */
+  margin-left: auto;
+  text-align: right;
   font-weight: 650;
   color: var(--danger);
 }
 
 .driver-due.overpaid {
+  font-weight: 600;
   color: var(--text-muted);
+}
+
+.driver-menu-position {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+}
+
+/* Archived drivers keep a taller layout with the restore / delete actions. */
+.driver-row-archived {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
 }
 
 .driver-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  padding-top: 16px;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
 }
 
@@ -463,12 +456,7 @@ function changeFilter(filter: OfficialFilter) {
   }
 
   .driver-row {
-    padding: 20px;
-  }
-
-  .driver-menu-position {
-    top: 20px;
-    right: 20px;
+    padding: 12px 16px;
   }
 
   .driver-actions {

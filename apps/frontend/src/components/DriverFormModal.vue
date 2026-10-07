@@ -56,22 +56,28 @@ function submit() {
       <fieldset class="form form-fields" :disabled="saving">
         <label class="field">
           <span>Фамилия</span>
-          <input v-model="form.lastName" required />
+          <input v-model="form.lastName" autocomplete="family-name" enterkeyhint="next" required />
         </label>
 
         <label class="field">
           <span>Имя</span>
-          <input v-model="form.firstName" required />
+          <input v-model="form.firstName" autocomplete="given-name" enterkeyhint="next" required />
         </label>
 
         <label class="field">
           <span>Отчество</span>
-          <input v-model="form.middleName" />
+          <input v-model="form.middleName" autocomplete="additional-name" enterkeyhint="next" />
         </label>
 
         <label class="field">
           <span>Телефон</span>
-          <input v-model="form.phone" type="tel" />
+          <input
+            v-model="form.phone"
+            type="tel"
+            inputmode="tel"
+            autocomplete="tel"
+            enterkeyhint="next"
+          />
         </label>
 
         <label class="checkbox-field">
@@ -85,7 +91,6 @@ function submit() {
         </label>
 
         <div class="actions">
-          <button type="button" class="btn-secondary" @click="emit('close')">Отмена</button>
           <LoadingButton
             type="submit"
             class="btn-primary"
@@ -93,6 +98,7 @@ function submit() {
             loading-text="Сохраняем…"
             >Сохранить</LoadingButton
           >
+          <button type="button" class="btn-secondary" @click="emit('close')">Отмена</button>
         </div>
       </fieldset>
     </form>

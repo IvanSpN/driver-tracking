@@ -17,27 +17,30 @@ async function handleLogout() {
 </script>
 
 <template>
-  <div class="shell">
+  <div class="shell" :class="{ 'shell-drivers': $route.name === 'drivers' }">
     <aside class="sidebar">
-      <div class="brand">Driver Tracking</div>
-
-      <nav class="nav">
+      <nav class="nav" aria-label="Основная навигация">
         <RouterLink to="/" class="nav-link">Дашборд</RouterLink>
-        <RouterLink to="/drivers" class="nav-link">Водители</RouterLink>
+        <RouterLink
+          to="/drivers"
+          class="nav-link"
+          :class="{ 'section-active': $route.name === 'driver-detail' }"
+          >Водители</RouterLink
+        >
         <RouterLink to="/settings" class="nav-link">Настройки</RouterLink>
       </nav>
 
       <div class="user-block">
         <div class="user-name">{{ auth.user?.fullName }}</div>
         <LoadingButton
-          class="logout-btn"
+          class="btn-secondary logout-btn"
           :loading="loggingOut"
           loading-text="Выходим…"
           @click="handleLogout"
           >Выйти</LoadingButton
         >
-        <p v-if="error" class="error-message" role="alert">{{ error }}</p>
       </div>
+      <p v-if="error" class="error-message logout-error" role="alert">{{ error }}</p>
     </aside>
 
     <main class="content">
@@ -49,109 +52,176 @@ async function handleLogout() {
 <style scoped>
 .shell {
   display: flex;
+  flex-direction: column;
   min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.shell-drivers {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.shell-drivers .content {
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .sidebar {
-  width: 220px;
   flex-shrink: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px 12px;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 16px
+    max(16px, env(safe-area-inset-left));
   background: var(--surface);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  padding: 20px 12px;
-}
-
-.brand {
-  font-weight: 600;
-  padding: 0 8px 20px;
+  border-bottom: 1px solid var(--border);
 }
 
 .nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .nav-link {
-  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: var(--control-height);
+  padding: 10px 6px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
   text-decoration: none;
-  font-size: 14px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
 }
 
-.nav-link:hover {
-  background: var(--surface-hover);
-}
-
+.nav-link.section-active,
 .nav-link.router-link-exact-active {
   background: var(--accent);
+  border-color: var(--accent);
   color: var(--accent-fg);
 }
 
 .user-block {
-  border-top: 1px solid var(--border);
-  padding-top: 12px;
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
+  min-width: 0;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .user-name {
-  font-size: 13px;
+  display: none;
   color: var(--text-muted);
-  padding: 0 8px;
+  font-size: 16px;
 }
 
 .logout-btn {
-  border: 1px solid var(--border);
-  background: var(--bg);
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  cursor: pointer;
-  font-size: 14px;
+  padding-inline: 12px;
 }
 
-.logout-btn:hover {
-  background: var(--surface-hover);
+.logout-error {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .content {
+  min-width: 0;
   flex: 1;
-  padding: 32px;
+  padding: 24px max(16px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
 }
 
-@media (max-width: 768px) {
+/* Include the page gutters and safe areas; the theme disappears with the view. */
+.content:has(> .driver-detail-official) {
+  background: var(--surface);
+}
+
+.content:has(> .driver-detail-unofficial) {
+  background: var(--driver-unofficial-surface);
+}
+
+@media (hover: hover) {
+  .nav-link:hover {
+    box-shadow: inset 0 0 0 1px currentColor;
+  }
+}
+
+.nav-link:active {
+  box-shadow: inset 0 0 0 2px currentColor;
+}
+
+@media (max-height: 500px) and (max-width: 959px) {
+  .shell-drivers .sidebar {
+    padding-block: max(8px, env(safe-area-inset-top)) 8px;
+    gap: 8px;
+    max-height: 35%;
+    overflow-y: auto;
+  }
+
+  .shell-drivers .nav {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .shell-drivers .content {
+    padding-block: 12px max(12px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (min-width: 960px) {
   .shell {
-    flex-direction: column;
+    flex-direction: row;
   }
 
   .sidebar {
-    width: 100%;
-    flex-direction: row;
-    align-items: center;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
+    width: 240px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 24px;
+    padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
+    border-right: 1px solid var(--border);
+    border-bottom: 0;
   }
 
   .nav {
-    flex-direction: row;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    flex: 1;
+  }
+
+  .nav-link {
+    justify-content: flex-start;
+    padding-inline: 14px;
+    font-size: 16px;
   }
 
   .user-block {
-    flex-direction: row;
-    border-top: none;
-    padding-top: 0;
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
   }
 
   .user-name {
-    display: none;
+    display: block;
   }
 
   .content {
-    padding: 16px;
+    padding: 36px max(32px, env(safe-area-inset-right)) max(36px, env(safe-area-inset-bottom)) 32px;
   }
 }
 </style>

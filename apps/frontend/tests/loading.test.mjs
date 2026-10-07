@@ -5,7 +5,7 @@ import { createServer } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { AxiosError, CanceledError } from 'axios'
 import { createPinia, setActivePinia } from 'pinia'
-import { createSSRApp } from 'vue'
+import { createRenderer, createSSRApp, h, nextTick, reactive, ssrContextKey } from 'vue'
 import { renderToString } from '@vue/server-renderer'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
@@ -15,13 +15,14 @@ let requestsPending
 let useAsyncAction
 let useDriversStore
 let getErrorMessage
+let formatPeriod
 
 before(async () => {
   server = await createServer({
     configFile: false,
     root: fileURLToPath(new URL('..', import.meta.url)),
     plugins: [vue()],
-    server: { middlewareMode: true, hmr: false, watch: null },
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null },
     appType: 'custom',
     logLevel: 'error',
   })
@@ -29,6 +30,7 @@ before(async () => {
   ;({ useAsyncAction } = await server.ssrLoadModule('/src/composables/useAsyncAction.ts'))
   ;({ useDriversStore } = await server.ssrLoadModule('/src/stores/drivers.ts'))
   ;({ getErrorMessage } = await server.ssrLoadModule('/src/utils/errors.ts'))
+  ;({ formatPeriod } = await server.ssrLoadModule('/src/utils/period.ts'))
 })
 
 after(async () => {
@@ -42,6 +44,35 @@ beforeEach(() => {
 function deferred() {
   return Promise.withResolvers()
 }
+
+test('payroll periods display all Russian month names and retain the year', () => {
+  const months = [
+    'январь',
+    'февраль',
+    'март',
+    'апрель',
+    'май',
+    'июнь',
+    'июль',
+    'август',
+    'сентябрь',
+    'октябрь',
+    'ноябрь',
+    'декабрь',
+  ]
+  for (const year of ['2025', '2026', '2027']) {
+    months.forEach((month, index) => {
+      const period = `${year}-${String(index + 1).padStart(2, '0')}`
+      assert.equal(formatPeriod(period), `${year}-${month}`)
+    })
+  }
+})
+
+test('unexpected payroll period values are displayed unchanged', () => {
+  for (const period of ['', '2026-00', '2026-13', '2026-1', '2026-10-01', 'not-a-period']) {
+    assert.equal(formatPeriod(period), period)
+  }
+})
 
 function controlledRequests() {
   const requests = []
@@ -208,6 +239,175 @@ test('errors explain timeouts and preserve server validation messages', () => {
   assert.equal(getErrorMessage(error), 'Проверьте дату')
 })
 
+test('modal tracks keyboard viewport, blocks closing while saving, and cleans up on navigation', async () => {
+  const { default: BaseModal } = await server.ssrLoadModule('/src/components/BaseModal.vue')
+  const originalWindow = globalThis.window
+  const originalDocument = globalThis.document
+  const listeners = { resize: new Set(), scroll: new Set() }
+  const viewport = {
+    height: 780,
+    offsetTop: 0,
+    scale: 1,
+    addEventListener: (name, callback) => listeners[name].add(callback),
+    removeEventListener: (name, callback) => listeners[name].delete(callback),
+  }
+  const pageStyle = { overflow: 'auto' }
+  globalThis.window = { visualViewport: viewport }
+  globalThis.document = { documentElement: { style: pageStyle } }
+  let element
+  let requestClose
+  let closes = 0
+  // A custom Vue host exercises lifecycle behavior without pretending to render Safari.
+  const renderer = createRenderer({
+    createElement: () => {
+      const style = new Map()
+      element = {
+        open: false,
+        style: { setProperty: (name, value) => style.set(name, value) },
+        values: style,
+        showModal() {
+          this.open = true
+        },
+        close() {
+          this.open = false
+        },
+      }
+      return element
+    },
+    insert: () => {},
+    remove: () => {},
+    patchProp: () => {},
+    setElementText: () => {},
+    createText: () => ({}),
+    createComment: () => ({}),
+    setText: () => {},
+    setComment: () => {},
+    parentNode: () => null,
+    nextSibling: () => null,
+  })
+  const Harness = {
+    ...BaseModal,
+    setup(props, context) {
+      const bindings = BaseModal.setup(props, context)
+      requestClose = bindings.requestClose
+      return () => h('dialog', { ref: bindings.dialog })
+    },
+  }
+  const props = reactive({ open: false, title: 'Тестовая форма', busy: false })
+  const app = renderer.createApp({
+    setup: () => () =>
+      h(Harness, {
+        ...props,
+        onClose: () => {
+          closes += 1
+        },
+      }),
+  })
+  app.provide(ssrContextKey, {})
+  let mounted = false
+  try {
+    app.mount({})
+    mounted = true
+    await nextTick()
+    assert.equal(element.open, false)
+    props.open = true
+    await nextTick()
+    assert.equal(element.open, true)
+    assert.equal(pageStyle.overflow, 'hidden')
+    assert.equal(element.values.get('--modal-viewport-height'), '780px')
+
+    viewport.height = 360
+    viewport.offsetTop = 100
+    for (const resize of listeners.resize) resize()
+    assert.equal(element.values.get('--modal-viewport-height'), '360px')
+    assert.equal(element.values.get('--modal-viewport-top'), '100px')
+    viewport.scale = 2
+    viewport.height = 180
+    for (const resize of listeners.resize) resize()
+    assert.equal(element.values.get('--modal-viewport-height'), '360px')
+
+    props.busy = true
+    await nextTick()
+    requestClose()
+    assert.equal(closes, 0)
+    props.busy = false
+    await nextTick()
+    requestClose()
+    assert.equal(closes, 1)
+
+    props.open = false
+    await nextTick()
+    assert.equal(element.open, false)
+    assert.equal(pageStyle.overflow, 'auto')
+    assert.equal(listeners.resize.size + listeners.scroll.size, 0)
+
+    props.open = true
+    await nextTick()
+    app.unmount()
+    mounted = false
+    assert.equal(element.open, false)
+    assert.equal(pageStyle.overflow, 'auto')
+    assert.equal(listeners.resize.size + listeners.scroll.size, 0)
+  } finally {
+    if (mounted) app.unmount()
+    if (originalWindow === undefined) delete globalThis.window
+    else globalThis.window = originalWindow
+    if (originalDocument === undefined) delete globalThis.document
+    else globalThis.document = originalDocument
+  }
+})
+
+test('drivers list has its own accessible scroll area, including loading, empty and error states', async () => {
+  const { default: component } = await server.ssrLoadModule('/src/views/DriversView.vue')
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/drivers/:id?', name: 'driver-detail', component }],
+  })
+  await router.push('/drivers')
+  for (const state of ['loaded', 'loading', 'empty', 'error']) {
+    const pinia = createPinia()
+    const store = useDriversStore(pinia)
+    store.loading = state === 'loading'
+    store.error = state === 'error' ? 'Нет связи' : ''
+    store.drivers =
+      state === 'loaded' ? [{ id: 'test', lastName: 'Тестовый', isOfficial: true }] : []
+    const html = await renderToString(createSSRApp(component).use(pinia).use(router))
+    const scrollArea = html.match(
+      /<section\b[^>]*class="drivers-scroll"[^>]*>([\s\S]*?)<\/section>/,
+    )
+    assert.ok(scrollArea, state)
+    assert.match(scrollArea[0], /tabindex="0"/)
+    assert.match(scrollArea[0], /aria-label="Список водителей"/)
+    assert.doesNotMatch(scrollArea[1], /Добавить водителя|Показать уволенных/)
+    assert.ok(html.indexOf('class="drivers-toolbar"') < scrollArea.index)
+    if (state === 'loaded') assert.match(scrollArea[1], /Тестовый/)
+    if (state === 'loading') assert.match(scrollArea[1], /Загружаем водителей/)
+    if (state === 'empty') assert.match(scrollArea[1], /Пока нет водителей/)
+    if (state === 'error') assert.match(scrollArea[1], /Повторить загрузку/)
+  }
+})
+
+test('viewport locking applies only to the drivers list, not the detail or other screens', async () => {
+  const { default: layout } = await server.ssrLoadModule('/src/layouts/AppLayout.vue')
+  const component = { render: () => h('div', 'Тестовая страница') }
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', name: 'dashboard', component },
+      { path: '/drivers', name: 'drivers', component },
+      { path: '/drivers/:id', name: 'driver-detail', component },
+      { path: '/settings', name: 'settings', component },
+    ],
+  })
+  for (const path of ['/drivers', '/drivers/test', '/settings', '/']) {
+    await router.push(path)
+    const html = await renderToString(createSSRApp(layout).use(createPinia()).use(router))
+    assert.equal(html.includes('shell-drivers'), path === '/drivers')
+    assert.match(html, /Основная навигация/)
+    assert.match(html, /Выйти/)
+  }
+})
+
 test('only dismissed drivers offer permanent deletion', async () => {
   const { default: component } = await server.ssrLoadModule('/src/views/DriversView.vue')
   const router = createRouter({
@@ -230,6 +430,67 @@ test('only dismissed drivers offer permanent deletion', async () => {
     const html = await renderToString(app)
     assert.equal(html.includes('Удалить навсегда'), dismissed)
     assert.equal(html.includes('Восстановить'), dismissed)
+  }
+})
+
+test('driver detail theme follows the driver status on every tab, even with no records', async () => {
+  const { default: component } = await server.ssrLoadModule('/src/views/DriverDetailView.vue')
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/drivers', name: 'drivers', component },
+      { path: '/drivers/:id', name: 'driver-detail', component },
+    ],
+  })
+  await router.push('/drivers/test-driver')
+
+  for (const isOfficial of [null, true, false]) {
+    for (const tab of ['payroll', 'shifts', 'overview']) {
+      for (const hasRecords of [false, true]) {
+        const Harness = {
+          ...component,
+          setup(props, context) {
+            const bindings = component.setup(props, context)
+            bindings.driver.value =
+              isOfficial === null
+                ? null
+                : { id: 'test-driver', firstName: 'Водитель', lastName: 'Тестовый', isOfficial }
+            bindings.tab.value = tab
+            if (hasRecords) {
+              bindings.shifts.value = [
+                { id: 'shift', startDate: '2026-10-01', isOfficial: !isOfficial },
+              ]
+              bindings.periods.value = [
+                {
+                  period: '2026-10',
+                  accruedWhiteMinor: 0,
+                  accruedBlackMinor: 0,
+                  paidWhiteMinor: 0,
+                  paidBlackMinor: 0,
+                  dueWhiteMinor: 0,
+                  dueBlackMinor: 0,
+                  payments: [],
+                },
+              ]
+            }
+            return bindings
+          },
+        }
+        const html = await renderToString(createSSRApp(Harness).use(router))
+        const root = html.match(/^<div\b[^>]*>/)?.[0] ?? ''
+        assert.ok(root.includes('driver-detail'))
+        assert.equal(root.includes('driver-detail-official'), isOfficial === true)
+        assert.equal(root.includes('driver-detail-unofficial'), isOfficial === false)
+        if (isOfficial !== null) {
+          const contentClass = { payroll: 'payroll', shifts: 'shifts', overview: 'overview' }[tab]
+          assert.ok(html.includes(`class="${contentClass}"`))
+          // Form dialogs retain their own surface, not the driver's status class.
+          for (const dialog of html.match(/<dialog\b[^>]*>/g) ?? []) {
+            assert.doesNotMatch(dialog, /driver-detail-(?:unofficial|official)/)
+          }
+        }
+      }
+    }
   }
 })
 

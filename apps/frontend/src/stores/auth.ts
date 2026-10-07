@@ -7,6 +7,10 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null)
   const ready = ref(false)
 
+  function clearSession() {
+    user.value = null
+  }
+
   // Восстанавливает сессию по httpOnly-куке при полной перезагрузке страницы.
   async function init() {
     try {
@@ -26,8 +30,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout() {
     await authApi.logout()
-    user.value = null
+    clearSession()
   }
 
-  return { user, ready, init, login, logout }
+  return { user, ready, init, login, logout, clearSession }
 })

@@ -77,11 +77,10 @@ function submit() {
 
         <label class="field">
           <span>Заметка</span>
-          <input v-model="form.note" type="text" />
+          <input v-model="form.note" type="text" enterkeyhint="done" />
         </label>
 
         <div class="actions">
-          <button type="button" class="btn-secondary" @click="emit('close')">Отмена</button>
           <LoadingButton
             type="submit"
             class="btn-primary"
@@ -90,6 +89,7 @@ function submit() {
             loading-text="Сохраняем…"
             >Сохранить</LoadingButton
           >
+          <button type="button" class="btn-secondary" @click="emit('close')">Отмена</button>
         </div>
       </fieldset>
     </form>

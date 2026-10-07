@@ -65,16 +65,23 @@ function submit() {
 
         <label class="field">
           <span>Сумма за месяц, ₽</span>
-          <input v-model.number="form.amountRub" type="number" min="0" step="0.01" required />
+          <input
+            v-model.number="form.amountRub"
+            type="number"
+            inputmode="decimal"
+            enterkeyhint="next"
+            min="0"
+            step="0.01"
+            required
+          />
         </label>
 
         <label class="field">
           <span>Заметка</span>
-          <input v-model="form.note" type="text" />
+          <input v-model="form.note" type="text" enterkeyhint="done" />
         </label>
 
         <div class="actions">
-          <button type="button" class="btn-secondary" @click="emit('close')">Отмена</button>
           <LoadingButton
             type="submit"
             class="btn-primary"
@@ -82,6 +89,7 @@ function submit() {
             loading-text="Сохраняем…"
             >Сохранить</LoadingButton
           >
+          <button type="button" class="btn-secondary" @click="emit('close')">Отмена</button>
         </div>
       </fieldset>
     </form>

@@ -20,19 +20,24 @@ withDefaults(
       :aria-hidden="loading || undefined"
       ><slot
     /></span>
-    <span v-if="loading" class="button-progress"><LoadingSpinner />{{ loadingText }}</span>
+    <span v-if="loading" class="button-progress"
+      ><LoadingSpinner /><span class="progress-text">{{ loadingText }}</span></span
+    >
   </button>
 </template>
 
 <style scoped>
 .loading-button {
   display: inline-grid;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   justify-items: center;
 }
 .button-label,
 .button-progress {
   grid-area: 1 / 1;
+  min-width: 0;
+  max-width: 100%;
 }
 .button-label-hidden {
   visibility: hidden;
@@ -42,5 +47,9 @@ withDefaults(
   align-items: center;
   justify-content: center;
   gap: 8px;
+}
+
+.progress-text {
+  min-width: 0;
 }
 </style>

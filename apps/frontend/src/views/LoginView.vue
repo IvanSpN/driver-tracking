@@ -29,7 +29,16 @@ async function submit() {
         <fieldset class="form form-fields" :disabled="loading">
           <label class="field">
             <span>Email</span>
-            <input v-model="email" type="email" required autocomplete="email" />
+            <input
+              v-model="email"
+              type="email"
+              inputmode="email"
+              required
+              autocomplete="email"
+              autocapitalize="none"
+              :spellcheck="false"
+              enterkeyhint="next"
+            />
           </label>
 
           <label class="field">
@@ -40,12 +49,17 @@ async function submit() {
               required
               minlength="6"
               autocomplete="current-password"
+              enterkeyhint="go"
             />
           </label>
 
-          <p v-if="error" class="error" role="alert">{{ error }}</p>
+          <p v-if="error" class="error-message" role="alert">{{ error }}</p>
 
-          <LoadingButton type="submit" class="submit-btn" :loading="loading" loading-text="Входим…"
+          <LoadingButton
+            type="submit"
+            class="btn-primary submit-btn"
+            :loading="loading"
+            loading-text="Входим…"
             >Войти</LoadingButton
           >
         </fieldset>
@@ -57,16 +71,16 @@ async function submit() {
 <style scoped>
 .auth-screen {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: var(--bg);
+  padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
 }
 
 .auth-card {
   width: 100%;
-  max-width: 360px;
+  max-width: 420px;
+  margin: auto;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -74,59 +88,13 @@ async function submit() {
 }
 
 .title {
-  font-size: 16px;
-  margin: 0 0 20px;
-  text-align: center;
-}
-
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.field input {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 9px 10px;
-  font-size: 16px;
-  color: var(--text);
-  background: var(--bg);
-}
-
-.field input:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.error {
-  color: var(--danger);
-  font-size: 13px;
-  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+  margin: 0 0 28px;
 }
 
 .submit-btn {
-  margin-top: 4px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: var(--accent);
-  color: var(--accent-fg);
-  padding: 10px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.submit-btn:disabled {
-  opacity: 0.6;
-  cursor: default;
+  width: 100%;
+  margin-top: 8px;
 }
 </style>

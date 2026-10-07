@@ -15,18 +15,8 @@ const auth = useAuthStore()
 </template>
 
 <style scoped>
-.page h1 {
-  font-size: 20px;
-  margin: 0 0 8px;
-}
-
-.empty-state {
-  color: var(--text-muted);
-  font-size: 14px;
-}
-
 .account {
-  margin-top: 16px;
-  font-size: 14px;
+  margin-top: 24px;
+  font-size: 17px;
 }
 </style>

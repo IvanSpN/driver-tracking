@@ -20,7 +20,7 @@ withDefaults(defineProps<{ label?: string; compact?: boolean }>(), { label: 'Ð—Ð
   min-height: 180px;
   padding: 24px;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: 17px;
 }
 .loading-state :deep(.loading-spinner) {
   font-size: 24px;

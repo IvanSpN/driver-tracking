@@ -86,13 +86,6 @@ function changeFilter(filter: OfficialFilter) {
 <template>
   <div class="page drivers-page">
     <div class="drivers-toolbar">
-      <div class="header">
-        <h1>Водители</h1>
-        <button class="btn-primary" :disabled="actionsDisabled" @click="openCreate">
-          Добавить водителя
-        </button>
-      </div>
-
       <div class="filters">
         <div class="segmented" role="group" aria-label="Статус водителей">
           <button
@@ -124,15 +117,28 @@ function changeFilter(filter: OfficialFilter) {
           </button>
         </div>
 
-        <label class="checkbox-field archive-toggle">
-          <input
-            v-model="store.showArchived"
-            type="checkbox"
-            :disabled="busy"
-            @change="store.fetchList()"
-          />
-          <span>Показать уволенных</span>
-        </label>
+        <div class="filter-actions">
+          <label class="checkbox-field archive-toggle">
+            <input
+              v-model="store.showArchived"
+              type="checkbox"
+              :disabled="busy"
+              @change="store.fetchList()"
+            />
+            <span>Показать уволенных</span>
+          </label>
+
+          <button
+            type="button"
+            class="btn-primary add-driver-button"
+            aria-label="Добавить водителя"
+            title="Добавить водителя"
+            :disabled="actionsDisabled"
+            @click="openCreate"
+          >
+            <span aria-hidden="true">+</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -270,33 +276,39 @@ function changeFilter(filter: OfficialFilter) {
   scroll-padding-block: 8px;
 }
 
-.header {
+.filters {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 12px;
   margin-bottom: 12px;
 }
 
-.header h1 {
-  margin: 0;
-  flex: 1;
-  min-width: 0;
-}
-
-.header > button {
-  flex: 0 1 180px;
-}
-
-.filters {
+.filter-actions {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .archive-toggle {
-  padding: 8px 0;
+  min-width: 0;
   color: var(--text-muted);
+}
+
+.add-driver-button {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.add-driver-button > span {
+  transform: translateY(-1px);
 }
 
 .driver-list {
@@ -435,16 +447,9 @@ function changeFilter(filter: OfficialFilter) {
 }
 
 @media (min-width: 600px) {
-  .header,
-  .filters {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-  }
-
   .segmented {
     min-width: 300px;
+    max-width: 420px;
   }
 
   .driver-row {

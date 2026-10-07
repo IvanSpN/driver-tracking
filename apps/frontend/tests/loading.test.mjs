@@ -497,6 +497,7 @@ test('driver detail theme follows the driver status on every tab, even with no r
           },
         }
         const html = await renderToString(createSSRApp(Harness).use(router))
+        assert.doesNotMatch(html, /back-link|← Водители/)
         const root = html.match(/^<div\b[^>]*>/)?.[0] ?? ''
         assert.ok(root.includes('driver-detail'))
         assert.equal(root.includes('driver-detail-official'), isOfficial === true)

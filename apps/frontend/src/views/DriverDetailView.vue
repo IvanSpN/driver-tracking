@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 import * as driversApi from '../api/drivers'
 import type { Driver } from '../api/drivers'
 import * as payrollApi from '../api/payroll'
@@ -194,8 +194,6 @@ function toggleExpand(period: string) {
       'driver-detail-unofficial': driver?.isOfficial === false,
     }"
   >
-    <RouterLink class="btn-secondary back-link" :to="{ name: 'drivers' }"> ← Водители </RouterLink>
-
     <LoadingState
       v-if="loading"
       :compact="!!driver"
@@ -500,10 +498,6 @@ function toggleExpand(period: string) {
 
 .empty-state {
   background: var(--driver-card-surface);
-}
-
-.back-link {
-  margin-bottom: 20px;
 }
 
 .tabs {

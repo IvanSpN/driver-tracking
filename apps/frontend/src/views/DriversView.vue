@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useDriversStore, type OfficialFilter } from '../stores/drivers'
 import DriverFormModal from '../components/DriverFormModal.vue'
+import DriverActionsMenu from '../components/DriverActionsMenu.vue'
 import LoadingButton from '../components/LoadingButton.vue'
 import LoadingState from '../components/LoadingState.vue'
 import { useAsyncAction } from '../composables/useAsyncAction'
@@ -45,9 +46,14 @@ async function handleSave(input: DriverInput) {
   })
 }
 
+function driverName(driver: Driver) {
+  return [driver.lastName, driver.firstName, driver.middleName].filter(Boolean).join(' ')
+}
+
 async function handleRemove(driver: Driver) {
-  if (actionsDisabled.value) return
-  if (!confirm(`Уволить ${driver.lastName} ${driver.firstName}?`)) return
+  if (actionsDisabled.value || driver.deletedAt) return
+  if (!confirm(`Уволить ${driverName(driver)}?\n\nВодитель будет перемещён в список уволенных.`))
+    return
   await run(`remove:${driver.id}`, async () => {
     await store.remove(driver.id)
     await store.fetchList()
@@ -164,8 +170,20 @@ function changeFilter(filter: OfficialFilter) {
           v-for="driver in store.drivers"
           :key="driver.id"
           class="driver-row"
-          :class="{ 'driver-row-unofficial': !driver.isOfficial }"
+          :class="{
+            'driver-row-unofficial': !driver.isOfficial,
+            'driver-row-active': !driver.deletedAt,
+          }"
         >
+          <DriverActionsMenu
+            v-if="!driver.deletedAt"
+            class="driver-menu-position"
+            :driver-name="driverName(driver)"
+            :disabled="actionsDisabled"
+            :loading="activeAction === `remove:${driver.id}`"
+            @edit="openEdit(driver)"
+            @dismiss="handleRemove(driver)"
+          />
           <div class="driver-info">
             <RouterLink
               :to="{ name: 'driver-detail', params: { id: driver.id } }"
@@ -197,43 +215,23 @@ function changeFilter(filter: OfficialFilter) {
             </span>
           </div>
 
-          <div class="driver-actions">
-            <template v-if="!driver.deletedAt">
-              <button
-                type="button"
-                class="btn-secondary"
-                :disabled="actionsDisabled"
-                @click="openEdit(driver)"
-              >
-                Редактировать
-              </button>
-              <LoadingButton
-                class="btn-secondary danger"
-                :disabled="actionsDisabled"
-                :loading="activeAction === `remove:${driver.id}`"
-                loading-text="Увольняем…"
-                @click="handleRemove(driver)"
-                >Уволить</LoadingButton
-              >
-            </template>
-            <template v-else>
-              <LoadingButton
-                class="btn-secondary"
-                :disabled="actionsDisabled"
-                :loading="activeAction === `restore:${driver.id}`"
-                loading-text="Восстанавливаем…"
-                @click="handleRestore(driver)"
-                >Восстановить</LoadingButton
-              >
-              <LoadingButton
-                class="btn-secondary danger"
-                :disabled="actionsDisabled"
-                :loading="activeAction === `delete:${driver.id}`"
-                loading-text="Удаляем…"
-                @click="handleDeletePermanently(driver)"
-                >Удалить навсегда</LoadingButton
-              >
-            </template>
+          <div v-if="driver.deletedAt" class="driver-actions">
+            <LoadingButton
+              class="btn-secondary"
+              :disabled="actionsDisabled"
+              :loading="activeAction === `restore:${driver.id}`"
+              loading-text="Восстанавливаем…"
+              @click="handleRestore(driver)"
+              >Восстановить</LoadingButton
+            >
+            <LoadingButton
+              class="btn-secondary danger"
+              :disabled="actionsDisabled"
+              :loading="activeAction === `delete:${driver.id}`"
+              loading-text="Удаляем…"
+              @click="handleDeletePermanently(driver)"
+              >Удалить навсегда</LoadingButton
+            >
           </div>
         </li>
       </ul>
@@ -348,6 +346,18 @@ function changeFilter(filter: OfficialFilter) {
   flex-wrap: wrap;
 }
 
+.driver-menu-position {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+}
+
+.driver-row-active .driver-name {
+  min-height: 48px;
+  padding-inline-end: 60px;
+}
+
 .driver-name {
   display: flex;
   align-items: center;
@@ -454,6 +464,11 @@ function changeFilter(filter: OfficialFilter) {
 
   .driver-row {
     padding: 20px;
+  }
+
+  .driver-menu-position {
+    top: 20px;
+    right: 20px;
   }
 
   .driver-actions {

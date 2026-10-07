@@ -50,6 +50,8 @@ export class AuthController {
     return { ok: true };
   }
 
+  // Clearing this browser's cookies must also work after access/refresh expiration.
+  @Public()
   @Post('logout')
   @HttpCode(204)
   logout(@Res({ passthrough: true }) res: Response) {

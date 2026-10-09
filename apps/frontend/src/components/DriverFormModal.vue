@@ -88,7 +88,7 @@ function submit() {
 
         <label class="field">
           <span>Заметка</span>
-          <textarea v-model="form.note" rows="2"></textarea>
+          <textarea v-model="form.note" rows="1"></textarea>
         </label>
 
         <div class="actions">

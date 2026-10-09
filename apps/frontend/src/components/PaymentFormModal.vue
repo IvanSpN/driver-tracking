@@ -6,18 +6,24 @@ import LoadingButton from './LoadingButton.vue'
 import type { Payment, PayChannel, PaymentType, PaymentMethod, PaymentInput } from '../api/payroll'
 import { formatMoney } from '../utils/money'
 
-const props = defineProps<{
-  open: boolean
-  payment?: Payment | null
-  defaultPeriod: string
-  defaultType?: PaymentType
-  // Предзаполненная сумма новой выплаты (для зарплаты — остаток за месяц), в копейках.
-  defaultAmountMinor?: number
-  // Остаток (начислено − выплачено) по месяцам, в копейках; ключ — «ГГГГ-ММ».
-  dueByPeriod?: Record<string, number>
-  saving?: boolean
-  error?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    payment?: Payment | null
+    defaultPeriod: string
+    defaultType?: PaymentType
+    // Предзаполненная сумма новой выплаты (для зарплаты — остаток за месяц), в копейках.
+    defaultAmountMinor?: number
+    // Остаток (начислено − выплачено) по месяцам, в копейках; ключ — «ГГГГ-ММ».
+    dueByPeriod?: Record<string, number>
+    // false — «чёрный» водитель: выплата всегда чёрная, выбор канала не нужен.
+    driverIsOfficial?: boolean
+    saving?: boolean
+    error?: string
+  }>(),
+  // Absent boolean props are cast to false by Vue; "not loaded yet" must stay undefined.
+  { driverIsOfficial: undefined },
+)
 const emit = defineEmits<{
   close: []
   save: [value: PaymentInput]
@@ -33,6 +39,8 @@ const form = reactive({
   method: 'CASH' as PaymentMethod,
   note: '',
 })
+
+const blackOnly = computed(() => props.driverIsOfficial === false)
 
 // Подсказка под суммой: остаток по выбранному месяцу (нет начисления — нет подсказки).
 const dueHint = computed(() => {
@@ -55,8 +63,9 @@ watch(
       props.defaultPeriod,
       props.defaultType,
       props.defaultAmountMinor,
+      props.driverIsOfficial,
     ] as const,
-  ([open, payment, defaultPeriod, defaultType, defaultAmountMinor]) => {
+  ([open, payment, defaultPeriod, defaultType, defaultAmountMinor, driverIsOfficial]) => {
     if (!open) return
     if (payment) {
       form.period = payment.period
@@ -68,7 +77,7 @@ watch(
       form.note = payment.note ?? ''
     } else {
       form.period = defaultPeriod
-      form.channel = 'WHITE'
+      form.channel = driverIsOfficial === false ? 'BLACK' : 'WHITE'
       // Первая выплата месяца — аванс; если аванс уже был — по умолчанию зарплата.
       form.type = defaultType ?? 'ADVANCE'
       form.amountRub = defaultAmountMinor ? defaultAmountMinor / 100 : ''
@@ -111,7 +120,7 @@ function submit() {
             <input v-model="form.period" type="month" required />
           </label>
 
-          <label class="field">
+          <label v-if="!blackOnly" class="field">
             <span>Оплата</span>
             <select v-model="form.channel" required>
               <option value="WHITE">Белая</option>
@@ -119,7 +128,7 @@ function submit() {
             </select>
           </label>
 
-          <label class="field">
+          <label class="field" :class="{ 'field-wide': blackOnly }">
             <span>Тип</span>
             <select v-model="form.type">
               <option value="ADVANCE">Аванс</option>

@@ -666,6 +666,26 @@ test('payment form offers white/black payment and restores the saved selection',
   }
 })
 
+test('payment form has no channel select for unofficial (black) drivers only', async () => {
+  const { default: component } = await server.ssrLoadModule('/src/components/PaymentFormModal.vue')
+  const render = (driverIsOfficial) =>
+    renderToString(
+      createSSRApp(component, { open: true, defaultPeriod: '2026-10', driverIsOfficial }),
+    )
+
+  const black = await render(false)
+  assert.doesNotMatch(black, /<span>Оплата<\/span>/)
+  assert.doesNotMatch(black, /value="WHITE"|value="BLACK"/)
+  assert.match(black, /<span>Тип<\/span>/)
+
+  // White drivers (and the moment before the driver has loaded) keep the choice.
+  for (const driverIsOfficial of [true, undefined]) {
+    const html = await render(driverIsOfficial)
+    assert.match(html, /<span>Оплата<\/span>/)
+    assert.match(html, /value="BLACK"/)
+  }
+})
+
 test('new payment form prefills the suggested amount; editing keeps the saved one', async () => {
   const { default: component } = await server.ssrLoadModule('/src/components/PaymentFormModal.vue')
   // Empty value is rendered by Vue as a bare `value` attribute.

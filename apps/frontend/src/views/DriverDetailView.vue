@@ -551,6 +551,7 @@ function handlePeriodAction(p: PayrollPeriod, key: string) {
       :default-type="paymentDefaultType"
       :default-amount-minor="paymentDefaultAmount"
       :due-by-period="paymentDueByPeriod"
+      :driver-is-official="driver?.isOfficial"
       :saving="pending"
       :error="error"
       @close="!pending && (paymentModalOpen = false)"

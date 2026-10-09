@@ -413,14 +413,15 @@ function handlePeriodAction(p: PayrollPeriod, key: string) {
                     <dd>{{ formatMoney(p.paidWhiteMinor + p.paidBlackMinor) }}</dd>
                     <ul v-if="p.payments.length" class="paid-breakdown">
                       <li v-for="payment in p.payments" :key="payment.id" class="paid-item">
+                        <span
+                          class="paid-marker"
+                          :class="payment.channel === 'WHITE' ? 'paid-marker-white' : 'paid-marker-black'"
+                          role="img"
+                          :aria-label="payment.channel === 'WHITE' ? 'белая' : 'чёрная'"
+                        ></span>
                         <span class="paid-what">
-                          <span
-                            class="badge paid-tag"
-                            :class="payment.channel === 'WHITE' ? 'badge-outline' : 'badge-solid'"
-                          >
-                            {{ payment.channel === 'WHITE' ? 'белая' : 'чёрная' }}
-                          </span>
-                          {{ paymentType(payment) }} · {{ formatDate(payment.paidAt) }}
+                          <span class="paid-type">{{ paymentType(payment) }}</span>
+                          <span class="paid-date">{{ formatDate(payment.paidAt) }}</span>
                         </span>
                         <span class="paid-sum">{{ formatMoney(payment.amountMinor) }}</span>
                       </li>
@@ -750,34 +751,51 @@ function handlePeriodAction(p: PayrollPeriod, key: string) {
   gap: 8px;
 }
 
+/* One line per payment: [channel marker] type · date ........ amount (right-aligned). */
 .paid-item {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 4px 12px;
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
   min-width: 0;
   font-size: 15px;
   font-weight: 500;
 }
 
+/* Filled bar = чёрная, hollow bar = белая (also announced via aria-label). */
+.paid-marker {
+  align-self: stretch;
+  min-height: 20px;
+  border-radius: 3px;
+  border: 1.5px solid var(--text);
+}
+
+.paid-marker-black {
+  background: var(--text);
+}
+
+.paid-marker-white {
+  background: transparent;
+  border-color: var(--text-muted);
+}
+
 .paid-what {
-  display: inline-flex;
-  align-items: baseline;
+  display: flex;
   flex-wrap: wrap;
-  gap: 4px 8px;
+  align-items: baseline;
+  gap: 0 8px;
   min-width: 0;
   color: var(--text-muted);
 }
 
-.paid-tag {
-  align-self: center;
-  font-size: 11px;
-  padding: 1px 7px;
+.paid-type {
+  color: var(--text);
 }
 
 .paid-sum {
-  min-width: 0;
+  /* Fixed-width digits + right edge = amounts line up on one column. */
+  white-space: nowrap;
+  text-align: right;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--text);

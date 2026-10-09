@@ -15,7 +15,7 @@ const { pending: loading, error, run } = useAsyncAction()
 async function submit() {
   await run('login', async () => {
     await auth.login(email.value, password.value)
-    await router.push({ name: 'dashboard' })
+    await router.push({ name: 'drivers' })
   })
 }
 </script>

@@ -418,12 +418,70 @@ test('drivers list has its own accessible scroll area, including loading, empty 
     assert.ok(html.indexOf('class="drivers-toolbar"') < scrollArea.index)
     assert.doesNotMatch(html, /<h1[^>]*>Водители<\/h1>/)
     assert.match(html, /aria-label="Добавить водителя"/)
-    // Кнопка добавления живёт в тулбаре, а не в прокручиваемом списке.
-    assert.ok(html.indexOf('aria-label="Добавить водителя"') < scrollArea.index)
+    // Плавающая кнопка добавления лежит вне прокручиваемого списка.
+    assert.ok(html.indexOf('aria-label="Добавить водителя"') > scrollArea.index + scrollArea[0].length)
+    assert.match(html, /aria-pressed="false"[^>]*>\s*На вахте/)
     if (state === 'loaded') assert.match(scrollArea[1], /Тестовый/)
     if (state === 'loading') assert.match(scrollArea[1], /Загружаем водителей/)
     if (state === 'empty') assert.match(scrollArea[1], /Пока нет водителей/)
     if (state === 'error') assert.match(scrollArea[1], /Повторить загрузку/)
+  }
+})
+
+test('"На вахте" filter keeps only drivers with a current shift and has its own empty state', async () => {
+  const { default: component } = await server.ssrLoadModule('/src/views/DriversView.vue')
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/drivers/:id?', name: 'driver-detail', component }],
+  })
+  await router.push('/drivers')
+  const render = async (drivers) => {
+    const pinia = createPinia()
+    const store = useDriversStore(pinia)
+    store.onShiftOnly = true
+    store.drivers = drivers
+    return renderToString(createSSRApp(component).use(pinia).use(router))
+  }
+  const onShift = { id: 'a', lastName: 'Вахтовик', isOfficial: true, currentShift: { endDate: null } }
+  const resting = { id: 'b', lastName: 'Отдыхающий', isOfficial: true, currentShift: null }
+
+  const mixed = await render([onShift, resting])
+  assert.match(mixed, /aria-pressed="true"/)
+  assert.match(mixed, /Вахтовик/)
+  assert.doesNotMatch(mixed, /Отдыхающий/)
+
+  const none = await render([resting])
+  assert.match(none, /Сейчас никто не на вахте/)
+  assert.doesNotMatch(none, /Пока нет водителей/)
+})
+
+test('list filters are restored after a reload and bad stored values fall back to defaults', async () => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+  const data = new Map()
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (key) => (data.has(key) ? data.get(key) : null),
+      setItem: (key, value) => data.set(key, String(value)),
+    },
+  })
+  try {
+    const first = useDriversStore(createPinia())
+    assert.equal(first.officialFilter, 'all')
+    assert.equal(first.onShiftOnly, false)
+    first.officialFilter = 'unofficial'
+    first.onShiftOnly = true
+    await nextTick()
+
+    const second = useDriversStore(createPinia())
+    assert.equal(second.officialFilter, 'unofficial')
+    assert.equal(second.onShiftOnly, true)
+
+    data.set('drivers.officialFilter', 'garbage')
+    assert.equal(useDriversStore(createPinia()).officialFilter, 'all')
+  } finally {
+    if (original) Object.defineProperty(globalThis, 'localStorage', original)
+    else delete globalThis.localStorage
   }
 })
 

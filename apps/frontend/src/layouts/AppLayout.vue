@@ -9,7 +9,6 @@ const auth = useAuthStore()
   <div class="shell" :class="{ 'shell-drivers': $route.name === 'drivers' }">
     <aside class="sidebar">
       <nav class="nav" aria-label="Основная навигация">
-        <RouterLink to="/" class="nav-link">Дашборд</RouterLink>
         <RouterLink
           to="/drivers"
           class="nav-link"
@@ -68,7 +67,7 @@ const auth = useAuthStore()
   grid-column: 1;
   grid-row: 1;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
 

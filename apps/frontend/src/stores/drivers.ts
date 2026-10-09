@@ -9,13 +9,32 @@ export type OfficialFilter = 'all' | 'official' | 'unofficial'
 // Сколько считаем список свежим: при входе в этот интервал сеть не дёргаем.
 const CACHE_TTL_MS = 45_000
 const ARCHIVED_PREF_KEY = 'drivers.showArchived'
+const OFFICIAL_PREF_KEY = 'drivers.officialFilter'
+const ON_SHIFT_PREF_KEY = 'drivers.onShiftOnly'
+
+function readPref(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function writePref(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    // приватный режим / недоступное хранилище — не критично
+  }
+}
 
 function readArchivedPref(): boolean {
-  try {
-    return localStorage.getItem(ARCHIVED_PREF_KEY) === '1'
-  } catch {
-    return false
-  }
+  return readPref(ARCHIVED_PREF_KEY) === '1'
+}
+
+function readOfficialPref(): OfficialFilter {
+  const value = readPref(OFFICIAL_PREF_KEY)
+  return value === 'official' || value === 'unofficial' ? value : 'all'
 }
 
 export const useDriversStore = defineStore('drivers', () => {
@@ -25,17 +44,16 @@ export const useDriversStore = defineStore('drivers', () => {
   let latestRequest = 0
   let lastLoadedAt = 0
   let lastKey = ''
-  const officialFilter = ref<OfficialFilter>('all')
-  // Переключатель живёт в Настройках; запоминаем выбор между сессиями.
+  // Фильтры списка запоминаем между сессиями.
+  const officialFilter = ref<OfficialFilter>(readOfficialPref())
+  // Фильтр «На вахте» считается на клиенте по currentShift — запрос не нужен.
+  const onShiftOnly = ref(readPref(ON_SHIFT_PREF_KEY) === '1')
+  // Переключатель живёт в Настройках.
   const showArchived = ref(readArchivedPref())
 
-  watch(showArchived, (value) => {
-    try {
-      localStorage.setItem(ARCHIVED_PREF_KEY, value ? '1' : '0')
-    } catch {
-      // приватный режим / недоступное хранилище — не критично
-    }
-  })
+  watch(officialFilter, (value) => writePref(OFFICIAL_PREF_KEY, value))
+  watch(onShiftOnly, (value) => writePref(ON_SHIFT_PREF_KEY, value ? '1' : '0'))
+  watch(showArchived, (value) => writePref(ARCHIVED_PREF_KEY, value ? '1' : '0'))
 
   // Набор данных зависит от фильтра и показа уволенных — кэш привязан к ним.
   function listKey() {
@@ -104,6 +122,7 @@ export const useDriversStore = defineStore('drivers', () => {
     loading,
     error,
     officialFilter,
+    onShiftOnly,
     showArchived,
     fetchList,
     create,

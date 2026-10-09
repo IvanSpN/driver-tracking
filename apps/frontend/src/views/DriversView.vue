@@ -16,6 +16,9 @@ const editingDriver = ref<Driver | null>(null)
 const { activeAction, pending, error, run } = useAsyncAction()
 const busy = computed(() => pending.value || store.loading)
 const actionsDisabled = computed(() => busy.value || !!store.error)
+const visibleDrivers = computed(() =>
+  store.onShiftOnly ? store.drivers.filter((driver) => driver.currentShift) : store.drivers,
+)
 
 onMounted(() => store.fetchList())
 
@@ -137,13 +140,12 @@ function changeFilter(filter: OfficialFilter) {
 
         <button
           type="button"
-          class="btn-primary add-driver-button"
-          aria-label="Добавить водителя"
-          title="Добавить водителя"
-          :disabled="actionsDisabled"
-          @click="openCreate"
+          class="shift-toggle"
+          :class="{ active: store.onShiftOnly }"
+          :aria-pressed="store.onShiftOnly"
+          @click="store.onShiftOnly = !store.onShiftOnly"
         >
-          <span aria-hidden="true">+</span>
+          На вахте
         </button>
       </div>
     </div>
@@ -164,10 +166,13 @@ function changeFilter(filter: OfficialFilter) {
       <p v-else-if="!store.error && store.drivers.length === 0" class="empty-state">
         Пока нет водителей.
       </p>
+      <p v-else-if="!store.error && visibleDrivers.length === 0" class="empty-state">
+        Сейчас никто не на вахте.
+      </p>
 
-      <ul v-if="store.drivers.length" class="driver-list" :aria-busy="store.loading">
+      <ul v-if="visibleDrivers.length" class="driver-list" :aria-busy="store.loading">
         <li
-          v-for="driver in store.drivers"
+          v-for="driver in visibleDrivers"
           :key="driver.id"
           class="driver-row"
           :class="{
@@ -235,6 +240,17 @@ function changeFilter(filter: OfficialFilter) {
       </ul>
     </section>
 
+    <button
+      type="button"
+      class="btn-primary add-driver-button"
+      aria-label="Добавить водителя"
+      title="Добавить водителя"
+      :disabled="actionsDisabled"
+      @click="openCreate"
+    >
+      <span aria-hidden="true">+</span>
+    </button>
+
     <DriverFormModal
       :open="modalOpen"
       :driver="editingDriver"
@@ -270,12 +286,14 @@ function changeFilter(filter: OfficialFilter) {
   /* Leave room for the focus outline of the stretched card links. */
   padding: 4px;
   scroll-padding-block: 8px;
+  /* Room for the floating add button so the last card is never covered. */
+  padding-bottom: 84px;
 }
 
 .filters {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: stretch;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
@@ -284,15 +302,57 @@ function changeFilter(filter: OfficialFilter) {
   min-width: 0;
 }
 
+/* Tight on 320px: labels get every spare pixel. */
+.filters .segmented button {
+  padding-inline: 2px;
+}
+
+/* Same height as the segmented control; the label wraps to two lines on phones. */
+.shift-toggle {
+  flex: 0 0 68px;
+  min-width: 0;
+  min-height: calc(var(--control-height) + 10px);
+  padding: 4px 6px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  cursor: pointer;
+}
+
+.shift-toggle.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+.shift-toggle:active {
+  box-shadow: inset 0 0 0 2px currentColor;
+}
+
+@media (hover: hover) {
+  .shift-toggle:not(.active):hover {
+    background: var(--surface-hover);
+  }
+}
+
 .add-driver-button {
-  flex: 0 0 48px;
-  width: 48px;
-  height: 48px;
+  position: fixed;
+  z-index: 5;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: 56px;
+  height: 56px;
   padding: 0;
   border-radius: 50%;
-  font-size: 32px;
+  font-size: 34px;
   font-weight: 400;
   line-height: 1;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.3);
 }
 
 .add-driver-button > span {
@@ -453,6 +513,19 @@ function changeFilter(filter: OfficialFilter) {
   .segmented {
     min-width: 300px;
     max-width: 420px;
+  }
+
+  .filters {
+    justify-content: flex-start;
+  }
+
+  .filters .segmented {
+    flex: 0 1 420px;
+  }
+
+  .shift-toggle {
+    flex: 0 0 auto;
+    padding-inline: 18px;
   }
 
   .driver-row {

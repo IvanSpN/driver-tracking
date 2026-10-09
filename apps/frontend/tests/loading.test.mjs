@@ -428,14 +428,19 @@ test('drivers list has its own accessible scroll area, including loading, empty 
   }
 })
 
-test('driver form uses the compact modal and keeps Save / Cancel in one actions bar', async () => {
-  const { default: component } = await server.ssrLoadModule('/src/components/DriverFormModal.vue')
-  const html = await renderToString(createSSRApp(component, { open: true }))
-  assert.match(html, /<dialog[^>]*class="[^"]*modal-compact/)
-  const actions = html.match(/<div class="actions">([\s\S]*?)<\/div>/)
-  assert.ok(actions)
-  assert.match(actions[1], /Сохранить/)
-  assert.match(actions[1], /Отмена/)
+test('driver and payment forms use the compact modal with Save / Cancel in one actions bar', async () => {
+  for (const [name, props] of [
+    ['DriverFormModal', {}],
+    ['PaymentFormModal', { defaultPeriod: '2026-10' }],
+  ]) {
+    const { default: component } = await server.ssrLoadModule(`/src/components/${name}.vue`)
+    const html = await renderToString(createSSRApp(component, { ...props, open: true }))
+    assert.match(html, /<dialog[^>]*class="[^"]*modal-compact/, name)
+    const actions = html.match(/<div class="actions">([\s\S]*?)<\/div>/)
+    assert.ok(actions, name)
+    assert.match(actions[1], /Сохранить/, name)
+    assert.match(actions[1], /Отмена/, name)
+  }
 })
 
 test('"На вахте" filter keeps only drivers with a current shift and has its own empty state', async () => {
@@ -652,6 +657,37 @@ test('payment form offers white/black payment and restores the saved selection',
     assert.match(html, /Зарплата/)
     assert.match(html, /Сумма, ₽/)
   }
+})
+
+test('new payment form prefills the suggested amount; editing keeps the saved one', async () => {
+  const { default: component } = await server.ssrLoadModule('/src/components/PaymentFormModal.vue')
+  const amountOf = (html) => html.match(/<input[^>]*\bvalue="([^"]*)"[^>]*type="number"/)?.[1]
+  const base = { open: true, defaultPeriod: '2026-10' }
+
+  const salary = await renderToString(
+    createSSRApp(component, { ...base, defaultType: 'SALARY', defaultAmountMinor: 14000050 }),
+  )
+  assert.equal(amountOf(salary), '140000.5')
+
+  const advance = await renderToString(createSSRApp(component, { ...base }))
+  assert.equal(amountOf(advance), '0')
+
+  const editing = await renderToString(
+    createSSRApp(component, {
+      ...base,
+      defaultAmountMinor: 14000050,
+      payment: {
+        period: '2026-10',
+        channel: 'WHITE',
+        type: 'SALARY',
+        amountMinor: 10000,
+        paidAt: '2026-10-05',
+        method: 'CASH',
+        note: null,
+      },
+    }),
+  )
+  assert.equal(amountOf(editing), '100')
 })
 
 test('monthly accrual form displays one amount without white/black fields', async () => {

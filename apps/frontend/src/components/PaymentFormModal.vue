@@ -9,6 +9,8 @@ const props = defineProps<{
   payment?: Payment | null
   defaultPeriod: string
   defaultType?: PaymentType
+  // Предзаполненная сумма новой выплаты (для зарплаты — остаток за месяц), в копейках.
+  defaultAmountMinor?: number
   saving?: boolean
   error?: string
 }>()
@@ -32,8 +34,15 @@ function todayIso() {
 }
 
 watch(
-  () => [props.open, props.payment, props.defaultPeriod, props.defaultType] as const,
-  ([open, payment, defaultPeriod, defaultType]) => {
+  () =>
+    [
+      props.open,
+      props.payment,
+      props.defaultPeriod,
+      props.defaultType,
+      props.defaultAmountMinor,
+    ] as const,
+  ([open, payment, defaultPeriod, defaultType, defaultAmountMinor]) => {
     if (!open) return
     if (payment) {
       form.period = payment.period
@@ -48,7 +57,7 @@ watch(
       form.channel = 'WHITE'
       // Первая выплата месяца — аванс; если аванс уже был — по умолчанию зарплата.
       form.type = defaultType ?? 'ADVANCE'
-      form.amountRub = 0
+      form.amountRub = (defaultAmountMinor ?? 0) / 100
       form.paidAt = todayIso()
       form.method = 'CASH'
       form.note = ''
@@ -73,67 +82,70 @@ function submit() {
 
 <template>
   <BaseModal
+    class="modal-compact"
     :open="open"
     :title="payment ? 'Изменить выплату' : 'Новая выплата'"
     :busy="saving"
     :error="error"
     @close="emit('close')"
   >
-    <form class="form" @submit.prevent="submit">
-      <fieldset class="form form-fields" :disabled="saving">
-        <label class="field">
-          <span>Месяц</span>
-          <input v-model="form.period" type="month" required />
-        </label>
+    <form class="form form-compact" @submit.prevent="submit">
+      <fieldset class="form form-fields form-compact" :disabled="saving">
+        <div class="field-grid">
+          <label class="field field-wide">
+            <span>Месяц</span>
+            <input v-model="form.period" type="month" required />
+          </label>
 
-        <label class="field">
-          <span>Оплата</span>
-          <select v-model="form.channel" required>
-            <option value="WHITE">Белая</option>
-            <option value="BLACK">Чёрная</option>
-          </select>
-        </label>
+          <label class="field">
+            <span>Оплата</span>
+            <select v-model="form.channel" required>
+              <option value="WHITE">Белая</option>
+              <option value="BLACK">Чёрная</option>
+            </select>
+          </label>
 
-        <label class="field">
-          <span>Тип</span>
-          <select v-model="form.type">
-            <option value="ADVANCE">Аванс</option>
-            <option value="SALARY">Зарплата</option>
-          </select>
-        </label>
+          <label class="field">
+            <span>Тип</span>
+            <select v-model="form.type">
+              <option value="ADVANCE">Аванс</option>
+              <option value="SALARY">Зарплата</option>
+            </select>
+          </label>
 
-        <label class="field">
-          <span>Сумма, ₽</span>
-          <input
-            v-model.number="form.amountRub"
-            type="number"
-            inputmode="decimal"
-            enterkeyhint="next"
-            min="1"
-            step="1"
-            required
-          />
-        </label>
+          <label class="field">
+            <span>Сумма, ₽</span>
+            <input
+              v-model.number="form.amountRub"
+              type="number"
+              inputmode="decimal"
+              enterkeyhint="next"
+              min="0.01"
+              step="0.01"
+              required
+            />
+          </label>
 
-        <label class="field">
-          <span>Дата выплаты</span>
-          <input v-model="form.paidAt" type="date" required />
-        </label>
+          <label class="field">
+            <span>Дата выплаты</span>
+            <input v-model="form.paidAt" type="date" required />
+          </label>
 
-        <label class="field">
-          <span>Способ</span>
-          <select v-model="form.method">
-            <option value="CASH">Наличные</option>
-            <option value="BANK">Банк</option>
-            <option value="CARD">Карта</option>
-            <option value="OTHER">Другое</option>
-          </select>
-        </label>
+          <label class="field field-wide">
+            <span>Способ</span>
+            <select v-model="form.method">
+              <option value="CASH">Наличные</option>
+              <option value="BANK">Банк</option>
+              <option value="CARD">Карта</option>
+              <option value="OTHER">Другое</option>
+            </select>
+          </label>
 
-        <label class="field">
-          <span>Заметка</span>
-          <input v-model="form.note" type="text" enterkeyhint="done" />
-        </label>
+          <label class="field field-wide">
+            <span>Заметка</span>
+            <input v-model="form.note" type="text" enterkeyhint="done" />
+          </label>
+        </div>
 
         <div class="actions">
           <LoadingButton

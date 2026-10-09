@@ -42,6 +42,7 @@ const paymentModalOpen = ref(false)
 const editingPayment = ref<Payment | null>(null)
 const paymentDefaultPeriod = ref('')
 const paymentDefaultType = ref<PaymentType>('ADVANCE')
+const paymentDefaultAmount = ref(0)
 
 const shiftModalOpen = ref(false)
 const editingShift = ref<Shift | null>(null)
@@ -156,6 +157,9 @@ function openPaymentModal(period?: string) {
   const found = periods.value.find((p) => p.period === target)
   const hasAdvance = !!found?.payments.some((payment) => payment.type === 'ADVANCE')
   paymentDefaultType.value = hasAdvance ? 'SALARY' : 'ADVANCE'
+  // Зарплата — это остаток за месяц (начислено − выплачено); аванс не считаем.
+  const due = found ? found.dueWhiteMinor + found.dueBlackMinor : 0
+  paymentDefaultAmount.value = paymentDefaultType.value === 'SALARY' && due > 0 ? due : 0
   paymentModalOpen.value = true
 }
 
@@ -531,6 +535,7 @@ function handlePeriodAction(p: PayrollPeriod, key: string) {
       :payment="editingPayment"
       :default-period="paymentDefaultPeriod"
       :default-type="paymentDefaultType"
+      :default-amount-minor="paymentDefaultAmount"
       :saving="pending"
       :error="error"
       @close="!pending && (paymentModalOpen = false)"

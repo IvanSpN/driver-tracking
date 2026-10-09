@@ -3,7 +3,10 @@
     "allow": [
       "Bash(ls \"/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe\" \"/c/Program Files/Google/Chrome/Application/chrome.exe\" 2>&1; ls /c/dev/driver-tracking/apps/frontend/dist/assets/)",
       "Read(//c/Program Files \\\\\\(x86\\\\\\)/Microsoft/Edge/Application/**)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(cat index.html)",
+      "Bash(grep -rn \"interactive-widget\\\\|visualViewport\\\\|virtualkeyboard\" src index.html)",
+      "Bash(npx prettier *)"
     ]
   }
 }

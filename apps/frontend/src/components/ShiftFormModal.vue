@@ -55,14 +55,15 @@ function submit() {
 
 <template>
   <BaseModal
+    class="modal-compact"
     :open="open"
     :title="shift ? 'Изменить вахту' : 'Новая вахта'"
     :busy="saving"
     :error="error"
     @close="emit('close')"
   >
-    <form class="form" @submit.prevent="submit">
-      <fieldset class="form form-fields" :disabled="saving">
+    <form class="form form-compact" @submit.prevent="submit">
+      <fieldset class="form form-fields form-compact" :disabled="saving">
         <label class="field">
           <span>Дата начала</span>
           <input v-model="form.startDate" type="date" :max="form.endDate || undefined" required />

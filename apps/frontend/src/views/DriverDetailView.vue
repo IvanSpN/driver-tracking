@@ -4,7 +4,13 @@ import { useRoute } from 'vue-router'
 import * as driversApi from '../api/drivers'
 import type { Driver } from '../api/drivers'
 import * as payrollApi from '../api/payroll'
-import type { AccrualInput, PayrollPeriod, Payment, PaymentInput, PaymentType } from '../api/payroll'
+import type {
+  AccrualInput,
+  PayrollPeriod,
+  Payment,
+  PaymentInput,
+  PaymentType,
+} from '../api/payroll'
 import * as shiftsApi from '../api/shifts'
 import type { Shift, ShiftInput } from '../api/shifts'
 import AccrualFormModal from '../components/AccrualFormModal.vue'
@@ -43,6 +49,9 @@ const editingPayment = ref<Payment | null>(null)
 const paymentDefaultPeriod = ref('')
 const paymentDefaultType = ref<PaymentType>('ADVANCE')
 const paymentDefaultAmount = ref(0)
+const paymentDueByPeriod = computed(() =>
+  Object.fromEntries(periods.value.map((p) => [p.period, p.dueWhiteMinor + p.dueBlackMinor])),
+)
 
 const shiftModalOpen = ref(false)
 const editingShift = ref<Shift | null>(null)
@@ -248,7 +257,8 @@ function shiftMenuBusy(shift: Shift): boolean {
 
 async function handleClearShiftEnd(shift: Shift) {
   if (actionsDisabled.value || !shift.endDate) return
-  if (!confirm('Убрать дату окончания вахты?\n\nВахта станет открытой — без даты окончания.')) return
+  if (!confirm('Убрать дату окончания вахты?\n\nВахта станет открытой — без даты окончания.'))
+    return
   await run(`clear-shift-end:${shift.id}`, async () => {
     await shiftsApi.updateShift(shift.id, { endDate: null })
     await load()
@@ -372,7 +382,9 @@ function handlePeriodAction(p: PayrollPeriod, key: string) {
               <div class="shift-main">
                 <span class="shift-dates">
                   с {{ formatDateLong(shift.startDate)
-                  }}<template v-if="shift.endDate"> по {{ formatDateLong(shift.endDate) }}</template>
+                  }}<template v-if="shift.endDate">
+                    по {{ formatDateLong(shift.endDate) }}</template
+                  >
                 </span>
                 <span v-if="!shift.endDate" class="shift-open">дата окончания вахты не задана</span>
               </div>
@@ -419,7 +431,9 @@ function handlePeriodAction(p: PayrollPeriod, key: string) {
                       <li v-for="payment in p.payments" :key="payment.id" class="paid-item">
                         <span
                           class="paid-marker"
-                          :class="payment.channel === 'WHITE' ? 'paid-marker-white' : 'paid-marker-black'"
+                          :class="
+                            payment.channel === 'WHITE' ? 'paid-marker-white' : 'paid-marker-black'
+                          "
                           role="img"
                           :aria-label="payment.channel === 'WHITE' ? 'белая' : 'чёрная'"
                         ></span>
@@ -536,6 +550,7 @@ function handlePeriodAction(p: PayrollPeriod, key: string) {
       :default-period="paymentDefaultPeriod"
       :default-type="paymentDefaultType"
       :default-amount-minor="paymentDefaultAmount"
+      :due-by-period="paymentDueByPeriod"
       :saving="pending"
       :error="error"
       @close="!pending && (paymentModalOpen = false)"

@@ -30,6 +30,11 @@ watch(
       if (!viewport || viewport.scale !== 1) return
       element.style.setProperty('--modal-viewport-height', `${viewport.height}px`)
       element.style.setProperty('--modal-viewport-top', `${viewport.offsetTop}px`)
+      // The on-screen keyboard shrinks the viewport: keep the focused field in sight.
+      const active = document.activeElement as HTMLElement | null
+      if (active && element.contains?.(active) && active.matches?.('input, select, textarea')) {
+        active.scrollIntoView?.({ block: 'nearest' })
+      }
     }
     resize()
     viewport?.addEventListener('resize', resize)

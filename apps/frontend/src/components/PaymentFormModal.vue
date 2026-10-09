@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import BaseModal from './BaseModal.vue'
+import ClearableNumberInput from './ClearableNumberInput.vue'
 import LoadingButton from './LoadingButton.vue'
 import type { Payment, PayChannel, PaymentType, PaymentMethod, PaymentInput } from '../api/payroll'
+import { formatMoney } from '../utils/money'
 
 const props = defineProps<{
   open: boolean
@@ -11,6 +13,8 @@ const props = defineProps<{
   defaultType?: PaymentType
   // Предзаполненная сумма новой выплаты (для зарплаты — остаток за месяц), в копейках.
   defaultAmountMinor?: number
+  // Остаток (начислено − выплачено) по месяцам, в копейках; ключ — «ГГГГ-ММ».
+  dueByPeriod?: Record<string, number>
   saving?: boolean
   error?: string
 }>()
@@ -23,10 +27,20 @@ const form = reactive({
   period: '',
   channel: 'WHITE' as PayChannel,
   type: 'ADVANCE' as PaymentType,
-  amountRub: 0,
+  // '' — поле пустое (после «очистить» или у новой выплаты без предложенной суммы).
+  amountRub: '' as number | '',
   paidAt: '',
   method: 'CASH' as PaymentMethod,
   note: '',
+})
+
+// Подсказка под суммой: остаток по выбранному месяцу (нет начисления — нет подсказки).
+const dueHint = computed(() => {
+  const due = props.dueByPeriod?.[form.period]
+  if (due === undefined) return ''
+  return due < 0
+    ? `Переплата за месяц: ${formatMoney(-due)}`
+    : `Остаток за месяц: ${formatMoney(due)}`
 })
 
 function todayIso() {
@@ -57,7 +71,7 @@ watch(
       form.channel = 'WHITE'
       // Первая выплата месяца — аванс; если аванс уже был — по умолчанию зарплата.
       form.type = defaultType ?? 'ADVANCE'
-      form.amountRub = (defaultAmountMinor ?? 0) / 100
+      form.amountRub = defaultAmountMinor ? defaultAmountMinor / 100 : ''
       form.paidAt = todayIso()
       form.method = 'CASH'
       form.note = ''
@@ -72,7 +86,7 @@ function submit() {
     period: form.period,
     channel: form.channel,
     type: form.type,
-    amountMinor: Math.round(form.amountRub * 100),
+    amountMinor: Math.round(Number(form.amountRub) * 100),
     paidAt: form.paidAt,
     method: form.method,
     note: form.note || undefined,
@@ -113,17 +127,19 @@ function submit() {
             </select>
           </label>
 
-          <label class="field">
+          <label class="field field-wide">
             <span>Сумма, ₽</span>
-            <input
-              v-model.number="form.amountRub"
-              type="number"
+            <ClearableNumberInput
+              v-model="form.amountRub"
               inputmode="decimal"
-              enterkeyhint="next"
+              enterkeyhint="done"
               min="0.01"
               step="0.01"
+              placeholder="0"
+              :aria-describedby="dueHint ? 'payment-due-hint' : undefined"
               required
             />
+            <span v-if="dueHint" id="payment-due-hint" class="field-hint">{{ dueHint }}</span>
           </label>
 
           <label class="field">
@@ -131,7 +147,7 @@ function submit() {
             <input v-model="form.paidAt" type="date" required />
           </label>
 
-          <label class="field field-wide">
+          <label class="field">
             <span>Способ</span>
             <select v-model="form.method">
               <option value="CASH">Наличные</option>

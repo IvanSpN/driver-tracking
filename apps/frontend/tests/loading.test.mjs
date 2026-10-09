@@ -419,7 +419,9 @@ test('drivers list has its own accessible scroll area, including loading, empty 
     assert.doesNotMatch(html, /<h1[^>]*>Водители<\/h1>/)
     assert.match(html, /aria-label="Добавить водителя"/)
     // Плавающая кнопка добавления лежит вне прокручиваемого списка.
-    assert.ok(html.indexOf('aria-label="Добавить водителя"') > scrollArea.index + scrollArea[0].length)
+    assert.ok(
+      html.indexOf('aria-label="Добавить водителя"') > scrollArea.index + scrollArea[0].length,
+    )
     assert.match(html, /aria-pressed="false"[^>]*>\s*На вахте/)
     if (state === 'loaded') assert.match(scrollArea[1], /Тестовый/)
     if (state === 'loading') assert.match(scrollArea[1], /Загружаем водителей/)
@@ -457,7 +459,12 @@ test('"На вахте" filter keeps only drivers with a current shift and has i
     store.drivers = drivers
     return renderToString(createSSRApp(component).use(pinia).use(router))
   }
-  const onShift = { id: 'a', lastName: 'Вахтовик', isOfficial: true, currentShift: { endDate: null } }
+  const onShift = {
+    id: 'a',
+    lastName: 'Вахтовик',
+    isOfficial: true,
+    currentShift: { endDate: null },
+  }
   const resting = { id: 'b', lastName: 'Отдыхающий', isOfficial: true, currentShift: null }
 
   const mixed = await render([onShift, resting])
@@ -661,16 +668,39 @@ test('payment form offers white/black payment and restores the saved selection',
 
 test('new payment form prefills the suggested amount; editing keeps the saved one', async () => {
   const { default: component } = await server.ssrLoadModule('/src/components/PaymentFormModal.vue')
-  const amountOf = (html) => html.match(/<input[^>]*\bvalue="([^"]*)"[^>]*type="number"/)?.[1]
+  // Empty value is rendered by Vue as a bare `value` attribute.
+  const amountOf = (html) => {
+    const match = html.match(/<input[^>]*\bvalue(?:="([^"]*)")?[^>]*type="number"/)
+    return match ? (match[1] ?? '') : undefined
+  }
   const base = { open: true, defaultPeriod: '2026-10' }
 
   const salary = await renderToString(
     createSSRApp(component, { ...base, defaultType: 'SALARY', defaultAmountMinor: 14000050 }),
   )
   assert.equal(amountOf(salary), '140000.5')
+  // Prefilled amount can be cleared with the × inside the field.
+  assert.match(salary, /<button[^>]*class="input-clear"[^>]*aria-label="Очистить сумму"/)
 
+  // New advance: empty field (no "0" to delete on the phone), so no × either.
   const advance = await renderToString(createSSRApp(component, { ...base }))
-  assert.equal(amountOf(advance), '0')
+  assert.equal(amountOf(advance), '')
+  assert.doesNotMatch(advance, /class="input-clear"/)
+  assert.doesNotMatch(advance, /field-hint/)
+
+  // Remaining for the chosen month is shown under the amount.
+  const withDue = await renderToString(
+    createSSRApp(component, { ...base, dueByPeriod: { '2026-10': 14000050, '2026-09': -500000 } }),
+  )
+  assert.match(withDue, /class="field-hint"[^>]*>Остаток за месяц: 140\s000,50\s₽/)
+  const overpaid = await renderToString(
+    createSSRApp(component, {
+      ...base,
+      defaultPeriod: '2026-09',
+      dueByPeriod: { '2026-09': -500000 },
+    }),
+  )
+  assert.match(overpaid, /Переплата за месяц: 5\s000,00\s₽/)
 
   const editing = await renderToString(
     createSSRApp(component, {
@@ -700,7 +730,8 @@ test('monthly accrual form displays one amount without white/black fields', asyn
       input.includes('type="number"'),
     )
     assert.equal(amountInputs.length, 1)
-    assert.match(amountInputs[0], initial ? /value="1234\.56"/ : /value="0"/)
+    // A new accrual starts with an empty field (Vue renders an empty value as a bare attribute).
+    assert.match(amountInputs[0], initial ? /value="1234\.56"/ : /value(?!=)/)
   }
 })
 

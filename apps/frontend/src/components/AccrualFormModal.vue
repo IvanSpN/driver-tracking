@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { reactive, watch } from 'vue'
 import BaseModal from './BaseModal.vue'
+import ClearableNumberInput from './ClearableNumberInput.vue'
 import LoadingButton from './LoadingButton.vue'
 import type { AccrualInput } from '../api/payroll'
 
@@ -23,7 +24,8 @@ const emit = defineEmits<{
 
 const form = reactive({
   period: '',
-  amountRub: 0,
+  // '' — поле пустое.
+  amountRub: '' as number | '',
   note: '',
 })
 
@@ -32,7 +34,7 @@ watch(
   ([open, initial]) => {
     if (!open) return
     form.period = initial?.period ?? ''
-    form.amountRub = (initial?.amountMinor ?? 0) / 100
+    form.amountRub = initial?.amountMinor ? initial.amountMinor / 100 : ''
     form.note = initial?.note ?? ''
   },
   { immediate: true },
@@ -42,7 +44,7 @@ function submit() {
   if (props.saving) return
   emit('save', {
     period: form.period,
-    amountMinor: Math.round(form.amountRub * 100),
+    amountMinor: Math.round(Number(form.amountRub) * 100),
     note: form.note || undefined,
   })
 }
@@ -50,14 +52,15 @@ function submit() {
 
 <template>
   <BaseModal
+    class="modal-compact"
     :open="open"
     title="Начисление за месяц"
     :busy="saving"
     :error="error"
     @close="emit('close')"
   >
-    <form class="form" @submit.prevent="submit">
-      <fieldset class="form form-fields" :disabled="saving">
+    <form class="form form-compact" @submit.prevent="submit">
+      <fieldset class="form form-fields form-compact" :disabled="saving">
         <label class="field">
           <span>Месяц</span>
           <input v-model="form.period" type="month" required />
@@ -65,13 +68,13 @@ function submit() {
 
         <label class="field">
           <span>Сумма за месяц, ₽</span>
-          <input
-            v-model.number="form.amountRub"
-            type="number"
+          <ClearableNumberInput
+            v-model="form.amountRub"
             inputmode="decimal"
             enterkeyhint="next"
             min="0"
             step="0.01"
+            placeholder="0"
             required
           />
         </label>

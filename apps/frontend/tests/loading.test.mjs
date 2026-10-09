@@ -428,6 +428,16 @@ test('drivers list has its own accessible scroll area, including loading, empty 
   }
 })
 
+test('driver form uses the compact modal and keeps Save / Cancel in one actions bar', async () => {
+  const { default: component } = await server.ssrLoadModule('/src/components/DriverFormModal.vue')
+  const html = await renderToString(createSSRApp(component, { open: true }))
+  assert.match(html, /<dialog[^>]*class="[^"]*modal-compact/)
+  const actions = html.match(/<div class="actions">([\s\S]*?)<\/div>/)
+  assert.ok(actions)
+  assert.match(actions[1], /Сохранить/)
+  assert.match(actions[1], /Отмена/)
+})
+
 test('"На вахте" filter keeps only drivers with a current shift and has its own empty state', async () => {
   const { default: component } = await server.ssrLoadModule('/src/views/DriversView.vue')
   const router = createRouter({

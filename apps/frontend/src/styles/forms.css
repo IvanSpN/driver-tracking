@@ -182,6 +182,88 @@ button[aria-busy='true'] {
   border-top: 1px solid var(--border);
 }
 
+/*
+ * Compact modal (driver form): tighter spacing, and the actions stay pinned to the
+ * bottom edge so Save / Cancel are reachable without scrolling, even with the keyboard open.
+ */
+.modal-compact .modal {
+  --modal-pad: 14px;
+
+  padding: var(--modal-pad);
+  scroll-padding-block: var(--modal-pad);
+}
+
+.modal-compact .modal-header {
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.modal-compact .modal .title {
+  margin: 0;
+  font-size: 20px;
+}
+
+.modal-compact .modal-header .modal-close {
+  flex-basis: 44px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+}
+
+.modal-compact .error-message {
+  margin-bottom: 8px;
+}
+
+.form-compact {
+  gap: 10px;
+}
+
+.form-compact .field {
+  gap: 4px;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.form-compact .field input,
+.form-compact .field select,
+.form-compact .field textarea {
+  min-height: 44px;
+  padding: 9px 12px;
+}
+
+.form-compact .field textarea {
+  min-height: 64px;
+}
+
+.form-compact .checkbox-field {
+  min-height: 44px;
+}
+
+.form-compact .actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 8px;
+  /* Bleed into the modal padding so content scrolls cleanly behind the bar. */
+  margin: 0 calc(-1 * var(--modal-pad)) calc(-1 * var(--modal-pad));
+  padding: 10px var(--modal-pad);
+  background: var(--surface);
+}
+
+.form-compact .actions > * {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding-inline: 8px;
+}
+
+.form-compact .actions > .btn-primary {
+  flex-grow: 1.4;
+}
+
 .btn-primary,
 .btn-secondary {
   display: inline-flex;
@@ -250,6 +332,23 @@ button[aria-busy='true'] {
     flex-direction: row;
     flex-wrap: wrap;
     justify-content: flex-end;
+  }
+
+  .modal-compact .modal {
+    --modal-pad: 20px;
+  }
+
+  .form-compact .actions {
+    justify-content: flex-end;
+  }
+
+  .form-compact .actions > * {
+    flex: 0 1 auto;
+    padding-inline: 16px;
+  }
+
+  .form-compact .actions > .btn-primary {
+    flex-grow: 0;
   }
 }
 
